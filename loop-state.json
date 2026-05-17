@@ -1,0 +1,16 @@
+{
+  "run": 0,
+  "max_runs": 200,
+  "phase": "balance",
+  "win_rate_last_5": null,
+  "consecutive_balanced": 0,
+  "last_error": null,
+  "history": [],
+  "backlog": [
+    { "id": 1, "title": "HP bar colors — green/yellow/red based on percentage", "status": "pending" },
+    { "id": 2, "title": "Second mine — add a neutral mine in the center of the map at (640, 360)", "status": "pending" },
+    { "id": 3, "title": "Soldier upgrades — pay gold at barracks to increase soldier damage by 10", "status": "pending" },
+    { "id": 4, "title": "Tower building — players can build defensive towers near base for 80 gold", "status": "pending" },
+    { "id": 5, "title": "Fog of war — units only reveal terrain within vision radius 150px, rest darkened", "status": "pending" }
+  ]
+}
