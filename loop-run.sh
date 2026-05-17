@@ -14,4 +14,6 @@ echo "=== Loop start: $(date) ===" >> /home/irik/turtle/loop.log
   "Kjør én autonom spill-loop-iterasjon for Frontline RTS. Les CLAUDE.md for protokollen (seksjonen LOOP PROTOCOL). Bruk alle nødvendige verktøy: les loop-state.json, naviger til http://localhost:5173, vent på at spillet er ferdig, les metrics fra #game-metrics, bestem neste handling (balance-patch eller feature), implementer den, og commit til git." \
   >> /home/irik/turtle/loop.log 2>&1
 
+git push origin master >> /home/irik/turtle/loop.log 2>&1
+
 echo "=== Loop slutt: $(date) ===" >> /home/irik/turtle/loop.log
