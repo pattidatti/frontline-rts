@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { THEME } from './config';
 
 const PROJECTILE_POOL_SIZE = 60;
 const FLOAT_TEXT_POOL_SIZE = 24;
@@ -54,7 +55,7 @@ export class VFXManager {
       this.textPool.push({ text, inUse: false });
     }
 
-    // Spark emitter (combat impacts)
+    // Spark emitter (maursyre-sprut ved kampimpakt)
     this.sparkEmitter = scene.add.particles(0, 0, 'spark', {
       lifespan: 320,
       speed: { min: 60, max: 180 },
@@ -62,11 +63,11 @@ export class VFXManager {
       scale: { start: 0.8, end: 0 },
       alpha: { start: 1, end: 0 },
       blendMode: 'ADD',
-      tint: [0xffe680, 0xff9944, 0xffffff],
+      tint: THEME.SPARK_TINTS,
       emitting: false,
     }).setDepth(15);
 
-    // Dust emitter (death, collapse)
+    // Dust emitter (jordstøv ved død/kollaps)
     this.dustEmitter = scene.add.particles(0, 0, 'spark', {
       lifespan: 600,
       speed: { min: 20, max: 80 },
@@ -74,7 +75,7 @@ export class VFXManager {
       gravityY: 60,
       scale: { start: 1.2, end: 0.2 },
       alpha: { start: 0.7, end: 0 },
-      tint: [0x666666, 0x999999, 0x444444],
+      tint: THEME.DUST_TINTS,
       emitting: false,
     }).setDepth(15);
   }

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CONFIG } from '../config';
+import { CONFIG, THEME } from '../config';
 import { VFXManager } from '../vfx';
 
 interface Vec2 { x: number; y: number; }
@@ -19,13 +19,14 @@ interface UnitData {
   selected: boolean;
   dead: boolean;
   container: Phaser.GameObjects.Container;
-  body: Phaser.GameObjects.Arc;
+  antBody: Phaser.GameObjects.Container;
+  body: Phaser.GameObjects.Ellipse;
+  segments: Phaser.GameObjects.Ellipse[];
   bodyColor: number;
   hpBg: Phaser.GameObjects.Rectangle;
   hpFg: Phaser.GameObjects.Rectangle;
   selectionRing: Phaser.GameObjects.Arc;
   selectionTween: Phaser.Tweens.Tween | null;
-  directionDot: Phaser.GameObjects.Arc;
   radius: number;
   lastDx: number; lastDy: number;
 }
@@ -36,7 +37,7 @@ interface BuildingData {
   faction: 'player' | 'ai' | 'neutral';
   x: number; y: number; w: number; h: number;
   hp: number; maxHp: number;
-  body: Phaser.GameObjects.Rectangle;
+  body: Phaser.GameObjects.Ellipse;
   bodyColor: number;
   hpBg: Phaser.GameObjects.Rectangle;
   hpFg: Phaser.GameObjects.Rectangle;
@@ -71,8 +72,11 @@ export class GameScene extends Phaser.Scene {
   private dragRect!: Phaser.GameObjects.Rectangle;
 
   private goldText!: Phaser.GameObjects.Text;
+  private selectionText!: Phaser.GameObjects.Text;
+  private hoverGfx!: Phaser.GameObjects.Graphics;
   private trainPanel: Phaser.GameObjects.Container | null = null;
   private trainPanelBounds: Phaser.Geom.Rectangle | null = null;
+  private trainButtons: { btn: Phaser.GameObjects.Text; cost: number; baseLabel: string; key: string }[] = [];
 
   private gameState: GameState = 'running';
   private gameTime = 0;
@@ -90,42 +94,73 @@ export class GameScene extends Phaser.Scene {
     const W = CONFIG.MAP_WIDTH;
     const H = CONFIG.MAP_HEIGHT;
 
-    // Background — gradient (cool blue on player side → warm red on AI side)
+    // Background — grass gradient (top brighter, bottom darker)
     const bg = this.add.graphics().setDepth(0);
-    bg.fillGradientStyle(0x14233a, 0x2a1418, 0x0a1424, 0x1f0d12, 1);
+    bg.fillGradientStyle(
+      THEME.GRASS_COLOR_TOP, THEME.GRASS_COLOR_TOP,
+      THEME.GRASS_COLOR_BOTTOM, THEME.GRASS_COLOR_BOTTOM, 1,
+    );
     bg.fillRect(0, 0, W, H);
 
-    // Subtle noise/dust — one-off pass, no runtime cost
+    // Subtle dust/dried-grass speckles
     const noise = this.add.graphics().setDepth(0);
     for (let i = 0; i < 220; i++) {
       const nx = Phaser.Math.Between(0, W);
       const ny = Phaser.Math.Between(0, H);
       const nr = Phaser.Math.FloatBetween(0.5, 1.8);
-      noise.fillStyle(0xffffff, Phaser.Math.FloatBetween(0.02, 0.06));
+      noise.fillStyle(THEME.NOISE_TINT, Phaser.Math.FloatBetween(0.04, 0.1));
       noise.fillCircle(nx, ny, nr);
+    }
+
+    // Pheromone trails — faint wavy lines drifting toward the center (very subtle)
+    const trails = this.add.graphics().setDepth(0);
+    trails.lineStyle(1, THEME.PHEROMONE_TRAIL_COLOR, 0.08);
+    for (let i = 0; i < 6; i++) {
+      const y0 = Phaser.Math.Between(60, H - 60);
+      trails.beginPath();
+      trails.moveTo(40, y0);
+      for (let x = 40; x < W - 40; x += 30) {
+        const yy = y0 + Math.sin((x + i * 70) * 0.018) * 18;
+        trails.lineTo(x, yy);
+      }
+      trails.strokePath();
+    }
+
+    // Grass blades — scattered short vertical strokes
+    const blades = this.add.graphics().setDepth(0);
+    for (let i = 0; i < 220; i++) {
+      const bx = Phaser.Math.Between(0, W);
+      const by = Phaser.Math.Between(0, H);
+      const len = Phaser.Math.Between(4, 9);
+      const tilt = Phaser.Math.FloatBetween(-1.5, 1.5);
+      const color = Math.random() < 0.5 ? THEME.GRASS_BLADE_COLOR : THEME.GRASS_BLADE_DARK;
+      blades.lineStyle(1, color, Phaser.Math.FloatBetween(0.35, 0.7));
+      blades.lineBetween(bx, by, bx + tilt, by - len);
+    }
+
+    // Pebbles — small ellipses with subtle shadow
+    for (let i = 0; i < 18; i++) {
+      const px = Phaser.Math.Between(30, W - 30);
+      const py = Phaser.Math.Between(30, H - 30);
+      const pw = Phaser.Math.Between(4, 7);
+      const ph = Phaser.Math.Between(3, 5);
+      const pc = THEME.PEBBLE_COLORS[i % THEME.PEBBLE_COLORS.length];
+      this.add.ellipse(px + 1, py + 1.5, pw, ph, 0x000000, 0.35).setDepth(0);
+      this.add.ellipse(px, py, pw, ph, pc).setDepth(0);
+      this.add.ellipse(px - pw * 0.2, py - ph * 0.25, pw * 0.45, ph * 0.4, 0xffffff, 0.18).setDepth(0);
     }
 
     // Vignette — subtle darkening at edges
     const vignette = this.add.graphics().setDepth(0);
-    vignette.fillStyle(0x000000, 0.35);
+    vignette.fillStyle(0x000000, 0.32);
     vignette.fillRect(0, 0, W, 60);
     vignette.fillRect(0, H - 60, W, 60);
     vignette.fillRect(0, 0, 60, H);
     vignette.fillRect(W - 60, 0, 60, H);
 
-    // Grid lines
-    const g = this.add.graphics().setDepth(0);
-    g.lineStyle(1, 0x1e2d3d, 0.6);
-    for (let y = 0; y <= H; y += 80) g.lineBetween(0, y, W, y);
-    for (let x = 0; x <= W; x += 80) g.lineBetween(x, 0, x, H);
-
-    // Center divider
-    g.lineStyle(2, 0x553344, 0.7);
-    g.lineBetween(W / 2, 0, W / 2, H);
-
-    // Drag selection box
-    this.dragRect = this.add.rectangle(0, 0, 1, 1, 0x4488ff, 0.15)
-      .setStrokeStyle(1, 0x4488ff, 0.8)
+    // Drag selection box (tan/sand for ant theme)
+    this.dragRect = this.add.rectangle(0, 0, 1, 1, 0xddcc88, 0.15)
+      .setStrokeStyle(1, 0xddcc88, 0.85)
       .setOrigin(0, 0)
       .setVisible(false)
       .setDepth(20);
@@ -150,18 +185,33 @@ export class GameScene extends Phaser.Scene {
 
     // HUD
     this.goldText = this.add.text(12, 12, '', {
-      fontSize: '16px', color: '#ffd700', fontFamily: 'monospace',
+      fontSize: '16px', color: '#f5dc6e', fontFamily: 'monospace',
     }).setDepth(25);
 
-    this.add.text(W - 12, 12, 'Click barracks to train  |  Right-click to command', {
-      fontSize: '12px', color: '#556677', fontFamily: 'monospace',
-    }).setOrigin(1, 0).setDepth(25);
+    this.selectionText = this.add.text(12, 34, '', {
+      fontSize: '13px', color: '#cfe3a3', fontFamily: 'monospace',
+    }).setDepth(25);
+
+    this.add.text(W - 12, H - 8, 'Klikk larvekammer eller Q/E  ·  Høyreklikk = kommando  ·  Esc rydder', {
+      fontSize: '12px', color: '#d8c896', fontFamily: 'monospace',
+    }).setOrigin(1, 1).setDepth(25);
+
+    // Hover-indikator (tegnes på nytt i onPointerMove)
+    this.hoverGfx = this.add.graphics().setDepth(22);
 
     // Input
     this.input.mouse?.disableContextMenu();
     this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointermove', this.onPointerMove, this);
     this.input.on('pointerup', this.onPointerUp, this);
+
+    // Tastatur
+    this.input.keyboard?.on('keydown-Q', () => this.trainUnit('worker'));
+    this.input.keyboard?.on('keydown-E', () => this.trainUnit('soldier'));
+    this.input.keyboard?.on('keydown-ESC', () => {
+      this.closeTrainPanel();
+      this.clearSelection();
+    });
 
     // Timers
     this.time.addEvent({ delay: CONFIG.MINE_TICK_INTERVAL, callback: this.mineTick, callbackScope: this, loop: true });
@@ -184,34 +234,64 @@ export class GameScene extends Phaser.Scene {
     kind: BuildingData['kind'], faction: BuildingData['faction'],
     x: number, y: number, w: number, h: number, hp: number,
   ): BuildingData {
-    const color = faction === 'player' ? 0x2255aa : faction === 'ai' ? 0xaa2222 : 0xaa8822;
-    const c = Phaser.Display.Color.IntegerToColor(color);
-    const topColor = Phaser.Display.Color.GetColor(
-      Math.min(255, c.red + 50), Math.min(255, c.green + 50), Math.min(255, c.blue + 50));
-    const baseColor = Phaser.Display.Color.GetColor(
-      Math.max(0, c.red - 50), Math.max(0, c.green - 50), Math.max(0, c.blue - 50));
+    const color = faction === 'player' ? THEME.BASE_COLOR_PLAYER
+      : faction === 'ai' ? THEME.BASE_COLOR_AI
+      : 0x886600;
+    const rim = faction === 'player' ? THEME.BASE_RIM_PLAYER : THEME.BASE_RIM_AI;
+    const highlight = faction === 'player' ? THEME.BASE_HIGHLIGHT_PLAYER : THEME.BASE_HIGHLIGHT_AI;
 
-    // Drop shadow
-    this.add.ellipse(x + 4, y + h / 2 + 6, w * 1.1, 10, 0x000000, 0.5).setDepth(1);
+    // Maurtue tegnes som en bred jordklump (ellipse) sett ovenfra.
+    // Bredde og høyde fra w/h beholdes for hit-detection (mode bygg-firkant), men selve grafikken
+    // er en oval dome som ser mer organisk ut.
+    const domeW = w * 1.4;
+    const domeH = h * 1.15;
 
-    // Main body (still tracked for HP/damage operations)
-    const body = this.add.rectangle(x, y, w, h, color).setDepth(2);
+    // Drop shadow under tuen
+    this.add.ellipse(x + 3, y + domeH * 0.45, domeW * 0.95, domeH * 0.4, 0x000000, 0.45).setDepth(1);
 
-    // 3D overlays: brighter top half, darker base
-    this.add.rectangle(x, y - h / 4, w, h / 2, topColor).setDepth(3).setAlpha(0.55);
-    this.add.rectangle(x, y + h / 4, w - 4, h / 2, baseColor).setDepth(3).setAlpha(0.7);
+    // Ytre rim (mørkere, danner kantvoll rundt inngangen)
+    this.add.ellipse(x, y, domeW * 1.05, domeH * 1.05, rim).setDepth(2).setAlpha(0.9);
 
-    // Thin highlight on top edge
-    this.add.rectangle(x, y - h / 2 + 1, w, 2, 0xffffff, 0.35).setDepth(4);
+    // Hovedkropp — denne sporer damage/tint (tracked som body)
+    const body = this.add.ellipse(x, y, domeW, domeH, color).setDepth(3);
 
-    const hpBg = this.add.rectangle(x, y - h / 2 - 7, 44, 5, 0x222222).setDepth(5).setVisible(false);
-    const hpFg = this.add.rectangle(x - 22, y - h / 2 - 7, 44, 5, 0x44ee44)
-      .setOrigin(0, 0.5).setDepth(5).setVisible(false);
+    // Topp-highlight (lysere brun klump på toppen av dommen)
+    this.add.ellipse(x - domeW * 0.15, y - domeH * 0.25, domeW * 0.7, domeH * 0.5, highlight, 0.7).setDepth(4);
 
-    const labelText = kind === 'base' ? 'BASE' : kind === 'barracks' ? 'BRCK' : 'MINE';
-    this.add.text(x, y, labelText, {
-      fontSize: '10px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(4);
+    // Subtil tekstur — små mørke flekker som antyder jordklumper
+    for (let i = 0; i < 8; i++) {
+      const dx = Phaser.Math.FloatBetween(-domeW * 0.35, domeW * 0.35);
+      const dy = Phaser.Math.FloatBetween(-domeH * 0.3, domeH * 0.3);
+      const ds = Phaser.Math.FloatBetween(1.5, 2.8);
+      this.add.ellipse(x + dx, y + dy, ds * 1.3, ds, rim, 0.4).setDepth(4);
+    }
+
+    // Inngangshull — peker mot midten av kartet
+    const entranceDir = x < CONFIG.MAP_WIDTH / 2 ? 1 : -1;
+    const entranceX = x + entranceDir * domeW * 0.28;
+    const entranceY = y + domeH * 0.1;
+    if (kind === 'base') {
+      // Stort tunell-inngang
+      this.add.ellipse(entranceX, entranceY, domeW * 0.32, domeH * 0.32, THEME.BASE_ENTRANCE_COLOR).setDepth(5);
+      this.add.ellipse(entranceX, entranceY - 1, domeW * 0.28, domeH * 0.18, 0x000000, 0.6).setDepth(5);
+    } else if (kind === 'barracks') {
+      // Mindre inngang + synlige hvite egg som ligger på toppen
+      this.add.ellipse(entranceX, entranceY, domeW * 0.22, domeH * 0.22, THEME.BASE_ENTRANCE_COLOR).setDepth(5);
+      // 3 egg på toppen av kammeret
+      const eggBaseX = x - domeW * 0.12;
+      const eggBaseY = y - domeH * 0.2;
+      for (let i = 0; i < 3; i++) {
+        const ex = eggBaseX + i * (domeW * 0.12);
+        const ey = eggBaseY + (i % 2 === 1 ? 2 : 0);
+        this.add.ellipse(ex + 0.5, ey + 1, 6.5, 4, 0x000000, 0.35).setDepth(5);
+        this.add.ellipse(ex, ey, 6, 3.5, THEME.BARRACKS_EGG_COLOR).setDepth(6);
+        this.add.ellipse(ex - 1, ey - 0.5, 2.5, 1.4, 0xffffff, 0.5).setDepth(7);
+      }
+    }
+
+    const hpBg = this.add.rectangle(x, y - domeH * 0.55 - 7, 44, 5, 0x222222).setDepth(8).setVisible(false);
+    const hpFg = this.add.rectangle(x - 22, y - domeH * 0.55 - 7, 44, 5, 0x44ee44)
+      .setOrigin(0, 0.5).setDepth(8).setVisible(false);
 
     const b: BuildingData = { id: this.nextId++, kind, faction, x, y, w, h, hp, maxHp: hp, body, bodyColor: color, hpBg, hpFg };
     this.buildings.push(b);
@@ -219,35 +299,88 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createMine(x: number, y: number): MineData {
-    // Drop shadow
-    this.add.ellipse(x + 3, y + 26, 46, 8, 0x000000, 0.5).setDepth(1);
+    // Bladlus-farm: et stort grønt blad med en sentral nerve, og 5 bladlus oppå.
+    // Bladet er en ellipse vridd litt, med en mørk nerve langs midten.
+    const leafW = 56;
+    const leafH = 40;
+    const tilt = Phaser.Math.FloatBetween(-0.25, 0.25);
 
-    // Shimmer halo
-    const halo = this.add.arc(x, y, 30, 0, 360, false, 0xffcc33, 0.2).setDepth(1);
+    // Drop shadow
+    this.add.ellipse(x + 3, y + leafH * 0.45, leafW * 0.95, leafH * 0.35, 0x000000, 0.4)
+      .setDepth(1).setRotation(tilt);
+
+    // Bladets underside (mørkere — ser tykkere ut)
+    this.add.ellipse(x, y + 1.5, leafW, leafH, THEME.APHID_LEAF_VEIN).setDepth(2).setRotation(tilt);
+
+    // Hovedbladet (body for hit-detection og tint)
+    const body = this.add.ellipse(x, y, leafW, leafH, THEME.APHID_LEAF_COLOR).setDepth(3).setRotation(tilt);
+
+    // Subtil highlight på bladet
+    this.add.ellipse(x - leafW * 0.15, y - leafH * 0.2, leafW * 0.6, leafH * 0.45, THEME.APHID_LEAF_HIGHLIGHT, 0.6)
+      .setDepth(4).setRotation(tilt);
+
+    // Sentral bladnerve + sidenerver tegnet via Graphics
+    const veins = this.add.graphics().setDepth(4);
+    veins.lineStyle(1.2, THEME.APHID_LEAF_VEIN, 0.85);
+    // Hovednerve (langs blad-aksen)
+    const cosT = Math.cos(tilt); const sinT = Math.sin(tilt);
+    const veinDx = leafW * 0.42;
+    veins.lineBetween(x - veinDx * cosT, y - veinDx * sinT, x + veinDx * cosT, y + veinDx * sinT);
+    // 3 sidenerver
+    for (let i = -1; i <= 1; i++) {
+      if (i === 0) continue;
+      const px = x + (veinDx * 0.35 * i) * cosT;
+      const py = y + (veinDx * 0.35 * i) * sinT;
+      const perpDx = -sinT * leafH * 0.32;
+      const perpDy = cosT * leafH * 0.32;
+      veins.lineStyle(0.8, THEME.APHID_LEAF_VEIN, 0.6);
+      veins.lineBetween(px, py, px + perpDx, py + perpDy);
+      veins.lineBetween(px, py, px - perpDx, py - perpDy);
+    }
+
+    // Bladlus — 5 små grønne ovaler plassert på bladet
+    const aphidPositions = [
+      { dx: -leafW * 0.18, dy: -leafH * 0.05 },
+      { dx: leafW * 0.08, dy: -leafH * 0.2 },
+      { dx: leafW * 0.22, dy: leafH * 0.08 },
+      { dx: -leafW * 0.05, dy: leafH * 0.22 },
+      { dx: leafW * 0.12, dy: leafH * 0.28 },
+    ];
+    const aphidGroup: Phaser.GameObjects.GameObject[] = [];
+    for (const p of aphidPositions) {
+      const ax = x + p.dx * cosT - p.dy * sinT;
+      const ay = y + p.dx * sinT + p.dy * cosT;
+      // skygge
+      this.add.ellipse(ax + 0.5, ay + 1, 6.5, 4.5, 0x000000, 0.35).setDepth(5);
+      // kropp
+      const aphid = this.add.ellipse(ax, ay, 6, 4.5, THEME.APHID_COLOR).setDepth(6);
+      // highlight
+      const sheen = this.add.ellipse(ax - 1, ay - 0.7, 2.5, 1.5, THEME.APHID_HIGHLIGHT, 0.85).setDepth(7);
+      // 2 små følehorn
+      const ant = this.add.graphics().setDepth(7);
+      ant.lineStyle(0.7, THEME.APHID_LEAF_VEIN, 0.9);
+      ant.lineBetween(ax + 2, ay - 1, ax + 4, ay - 2.5);
+      ant.lineBetween(ax + 2, ay + 1, ax + 4, ay + 2.5);
+      aphidGroup.push(aphid, sheen);
+    }
+
+    // Subtil puls på bladlusene
     this.tweens.add({
-      targets: halo,
-      scale: 1.25,
-      alpha: 0.05,
+      targets: aphidGroup,
+      scale: 1.12,
       yoyo: true,
       repeat: -1,
-      duration: 1200,
+      duration: 1250,
       ease: 'Sine.easeInOut',
     });
 
-    const body = this.add.rectangle(x, y, 42, 42, 0x886600).setDepth(2);
-
-    // Top/base layers for 3D feel
-    this.add.rectangle(x, y - 10, 42, 22, 0xddaa22).setDepth(3).setAlpha(0.7);
-    this.add.rectangle(x, y + 11, 38, 20, 0x553300).setDepth(3).setAlpha(0.7);
-    this.add.rectangle(x, y - 20, 42, 2, 0xffee88, 0.6).setDepth(4);
-
-    const hpBg = this.add.rectangle(x, y - 28, 38, 4, 0x222222).setDepth(5).setVisible(false);
-    const hpFg = this.add.rectangle(x - 19, y - 28, 38, 4, 0xffcc00).setOrigin(0, 0.5).setDepth(5).setVisible(false);
-    this.add.text(x, y, '⬡', { fontSize: '18px', color: '#ffee88', fontStyle: 'bold' }).setOrigin(0.5).setDepth(4);
+    const hpBg = this.add.rectangle(x, y - leafH * 0.55, 38, 4, 0x222222).setDepth(8).setVisible(false);
+    const hpFg = this.add.rectangle(x - 19, y - leafH * 0.55, 38, 4, 0xffcc00).setOrigin(0, 0.5).setDepth(8).setVisible(false);
 
     const mine: MineData = {
       id: this.nextId++, kind: 'mine', faction: 'neutral',
-      x, y, w: 42, h: 42, hp: 9999, maxHp: 9999, body, bodyColor: 0x886600, hpBg, hpFg,
+      x, y, w: leafW, h: leafH,
+      hp: 9999, maxHp: 9999, body, bodyColor: THEME.APHID_LEAF_COLOR, hpBg, hpFg,
     };
     this.buildings.push(mine);
     this.mines.push(mine);
@@ -257,47 +390,110 @@ export class GameScene extends Phaser.Scene {
   private spawnUnit(faction: 'player' | 'ai', type: 'worker' | 'soldier', x: number, y: number): UnitData {
     const isSoldier = type === 'soldier';
     const isPlayer = faction === 'player';
-    const r = isSoldier ? 12 : 9;
+
+    // Faction-baserte farger
     const bodyColor = isPlayer
-      ? (isSoldier ? 0x4488ff : 0x2255aa)
-      : (isSoldier ? 0xff4444 : 0xaa2222);
+      ? (isSoldier ? THEME.PLAYER_SOLDIER_COLOR : THEME.PLAYER_WORKER_COLOR)
+      : (isSoldier ? THEME.AI_SOLDIER_COLOR : THEME.AI_WORKER_COLOR);
+    const legColor = isPlayer ? THEME.ANT_LEG_COLOR_PLAYER : THEME.ANT_LEG_COLOR_AI;
+    const headHighlight = isPlayer ? THEME.ANT_HEAD_HIGHLIGHT_PLAYER : THEME.ANT_HEAD_HIGHLIGHT_AI;
+    const mandibleColor = isPlayer ? THEME.ANT_MANDIBLE_COLOR_PLAYER : THEME.ANT_MANDIBLE_COLOR_AI;
 
-    const c = Phaser.Display.Color.IntegerToColor(bodyColor);
-    const glowColor = Phaser.Display.Color.GetColor(
-      Math.min(255, c.red + 80), Math.min(255, c.green + 80), Math.min(255, c.blue + 80));
-    const dotColor = Phaser.Display.Color.GetColor(
-      Math.min(255, c.red + 130), Math.min(255, c.green + 130), Math.min(255, c.blue + 130));
+    // Maur-proporsjoner (ant lokal-koordinatsystem: +X = forover)
+    const dims = isSoldier
+      ? { abdW: 13, abdH: 9, abdX: -7, thW: 7, thH: 6, hdW: 9, hdH: 8, hdX: 7, legLen: 8, antLen: 7, mandLen: 5 }
+      : { abdW: 9, abdH: 6.5, abdX: -4.5, thW: 5, thH: 4.5, hdW: 6, hdH: 5.5, hdX: 4.5, legLen: 5.5, antLen: 5, mandLen: 0 };
+    const r = isSoldier ? 13 : 9;
 
-    // Footprint (faction-colored ring on the ground)
-    const footprint = this.add.ellipse(0, r * 0.5, r * 2.1, r * 0.7, bodyColor, 0.25);
+    // Footprint og skygge (ground-plane, ikke roterende)
+    const footprint = this.add.ellipse(0, r * 0.45, r * 2.0, r * 0.6, bodyColor, 0.22);
+    const shadow = this.add.ellipse(2, r * 0.35, r * 1.7, r * 0.6, 0x000000, 0.42);
 
-    // Drop shadow
-    const shadow = this.add.ellipse(2, r * 0.4, r * 1.8, r * 0.7, 0x000000, 0.45);
+    // Ant-body sub-container (roterer med bevegelsesretning, holder alle kropps-deler)
+    const antBody = this.add.container(0, 0);
 
-    // Main body
-    const body = this.add.arc(0, 0, r, 0, 360, false, bodyColor);
+    // Bein og følehorn/mandibler tegnes via Graphics (billig, en-shot)
+    const legs = this.add.graphics();
+    legs.lineStyle(1.4, legColor, 0.95);
+    const drawLegPair = (rootX: number, tipX: number, sign: number) => {
+      const rootY = sign * dims.thH * 0.4;
+      const tipY = sign * (dims.thH * 0.4 + dims.legLen);
+      // To-segments bein med en svak "kne"-knekk
+      const kneeX = (rootX + tipX) / 2 + sign * 0.5;
+      const kneeY = sign * (dims.thH * 0.4 + dims.legLen * 0.5);
+      legs.beginPath();
+      legs.moveTo(rootX, rootY);
+      legs.lineTo(kneeX, kneeY);
+      legs.lineTo(tipX, tipY);
+      legs.strokePath();
+    };
+    // Tre par bein: front, midt, bak (langs X-akse)
+    const legFrontX = dims.thW * 0.35;
+    const legMidX = 0;
+    const legRearX = -dims.thW * 0.35;
+    drawLegPair(legFrontX, legFrontX + dims.legLen * 0.5, -1);
+    drawLegPair(legMidX, legMidX, -1);
+    drawLegPair(legRearX, legRearX - dims.legLen * 0.5, -1);
+    drawLegPair(legFrontX, legFrontX + dims.legLen * 0.5, 1);
+    drawLegPair(legMidX, legMidX, 1);
+    drawLegPair(legRearX, legRearX - dims.legLen * 0.5, 1);
 
-    // Inner glow (offset highlight)
-    const glow = this.add.arc(-r * 0.35, -r * 0.35, r * 0.45, 0, 360, false, glowColor)
-      .setAlpha(0.55);
+    // Kropps-segmenter (abdomen bak, thorax midt, hode forrest — som ellipser orientert langs X)
+    const abdomen = this.add.ellipse(dims.abdX, 0, dims.abdW, dims.abdH, bodyColor);
+    const thorax = this.add.ellipse(0, 0, dims.thW, dims.thH, bodyColor);
+    const head = this.add.ellipse(dims.hdX, 0, dims.hdW, dims.hdH, bodyColor);
+    // Subtil hode-highlight (gjør hodet litt lysere så det leses som hode)
+    const headSheen = this.add.ellipse(dims.hdX - 0.5, -dims.hdH * 0.15, dims.hdW * 0.55, dims.hdH * 0.45, headHighlight, 0.7);
 
-    // Outline ring
-    const outline = this.add.arc(0, 0, r, 0, 360, false, 0x000000, 0)
-      .setStrokeStyle(1.5, 0x0a0a14, 0.8);
+    // Svart outline-stroke på segmenter
+    abdomen.setStrokeStyle(0.8, 0x000000, 0.7);
+    thorax.setStrokeStyle(0.8, 0x000000, 0.7);
+    head.setStrokeStyle(0.8, 0x000000, 0.7);
 
-    // Direction indicator (small bright dot pointing forward)
-    const dirDot = this.add.arc(r * 0.55, 0, 2.6, 0, 360, false, dotColor);
+    // Følehorn og (for soldater) mandibler — tegnet på samme Graphics-objekt for ytelse
+    const appendages = this.add.graphics();
+    // Følehorn (V-formet fra hodets front, lett buet)
+    appendages.lineStyle(1, legColor, 1);
+    const antRootX = dims.hdX + dims.hdW * 0.35;
+    const antRootYL = -dims.hdH * 0.2;
+    const antRootYR = dims.hdH * 0.2;
+    const antTipXL = antRootX + dims.antLen * 0.9;
+    const antTipYL = antRootYL - dims.antLen * 0.7;
+    const antTipXR = antRootX + dims.antLen * 0.9;
+    const antTipYR = antRootYR + dims.antLen * 0.7;
+    appendages.beginPath();
+    appendages.moveTo(antRootX, antRootYL);
+    appendages.lineTo(antRootX + dims.antLen * 0.45, antRootYL - dims.antLen * 0.3);
+    appendages.lineTo(antTipXL, antTipYL);
+    appendages.strokePath();
+    appendages.beginPath();
+    appendages.moveTo(antRootX, antRootYR);
+    appendages.lineTo(antRootX + dims.antLen * 0.45, antRootYR + dims.antLen * 0.3);
+    appendages.lineTo(antTipXR, antTipYR);
+    appendages.strokePath();
+    // Mandibler — kun soldater
+    if (isSoldier) {
+      appendages.lineStyle(1.6, mandibleColor, 1);
+      const mRootX = dims.hdX + dims.hdW * 0.45;
+      const mTipX = mRootX + dims.mandLen;
+      const mTipYHalf = dims.hdH * 0.45;
+      appendages.lineBetween(mRootX, -dims.hdH * 0.15, mTipX, -mTipYHalf);
+      appendages.lineBetween(mRootX, dims.hdH * 0.15, mTipX, mTipYHalf);
+    }
 
-    const hpBg = this.add.rectangle(0, -r - 7, r * 2, 4, 0x111111).setStrokeStyle(1, 0x000000, 0.5);
-    const hpFg = this.add.rectangle(-r, -r - 7, r * 2, 4, 0x44ee44).setOrigin(0, 0.5);
+    // Rekkefølge i antBody: bein bak alt annet, så segmenter, så højdere
+    antBody.add([legs, abdomen, thorax, head, headSheen, appendages]);
+
+    // HP-bar og selection-ring lever på ytre container (roteres ikke)
+    const hpBg = this.add.rectangle(0, -r - 6, r * 2, 4, 0x111111).setStrokeStyle(1, 0x000000, 0.5);
+    const hpFg = this.add.rectangle(-r, -r - 6, r * 2, 4, 0x44ee44).setOrigin(0, 0.5);
     const selRing = this.add.arc(0, 0, r + 5, 0, 360, false, 0xffffff, 0)
       .setStrokeStyle(2, 0xffffff, 1).setVisible(false);
 
-    // Hide HP bar at full health
     hpBg.setVisible(false);
     hpFg.setVisible(false);
 
-    const container = this.add.container(x, y, [footprint, shadow, body, glow, outline, dirDot, hpBg, hpFg, selRing]).setDepth(5);
+    const container = this.add.container(x, y, [footprint, shadow, antBody, hpBg, hpFg, selRing]).setDepth(5);
 
     const unit: UnitData = {
       id: this.nextId++, faction, type, x, y,
@@ -310,8 +506,9 @@ export class GameScene extends Phaser.Scene {
       lastAttackAt: 0,
       state: 'idle', moveTarget: null, attackTarget: null, mineTarget: null,
       selected: false, dead: false,
-      container, body, bodyColor, hpBg, hpFg, selectionRing: selRing,
-      selectionTween: null, directionDot: dirDot, radius: r,
+      container, antBody, body: thorax, segments: [abdomen, thorax, head],
+      bodyColor, hpBg, hpFg, selectionRing: selRing,
+      selectionTween: null, radius: r,
       lastDx: isPlayer ? 1 : -1, lastDy: 0,
     };
 
@@ -366,9 +563,22 @@ export class GameScene extends Phaser.Scene {
     const pw = this.units.filter(u => u.faction === 'player' && u.type === 'worker').length;
     const as_ = this.units.filter(u => u.faction === 'ai' && u.type === 'soldier').length;
     this.goldText.setText(
-      `Gold: ${this.playerGold}g   Soldiers: ${ps}   Workers: ${pw}` +
-      `        AI Gold: ${this.aiGold}g   AI Soldiers: ${as_}`
+      `Mat ${this.playerGold}  ·  Sold ${ps}  ·  Arb ${pw}        Fiende: ${this.aiGold} mat / ${as_} sold`
     );
+
+    const sel = this.selectedUnits;
+    if (sel.length === 0) {
+      this.selectionText.setText('');
+    } else {
+      const ss = sel.filter(u => u.type === 'soldier').length;
+      const sw = sel.filter(u => u.type === 'worker').length;
+      const parts: string[] = [];
+      if (ss > 0) parts.push(`${ss} soldat${ss === 1 ? '' : 'er'}`);
+      if (sw > 0) parts.push(`${sw} arbeider${sw === 1 ? '' : 'e'}`);
+      this.selectionText.setText(`Valgt: ${parts.join(', ')}`);
+    }
+
+    if (this.trainPanel) this.refreshTrainButtons();
   }
 
   // ── Unit behavior ────────────────────────────────────────────────────────
@@ -377,17 +587,12 @@ export class GameScene extends Phaser.Scene {
     unit.container.setPosition(unit.x, unit.y);
     unit.selectionRing.setVisible(unit.selected);
 
-    // Idle-bob: subtle sine offset on body + glow only (HP/selection/footprint stay anchored)
-    const bob = Math.sin((time + unit.id * 137) * 0.004) * 1.4;
-    unit.body.y = bob;
+    // Idle-bob (bobber hele ant-body, ikke HP-bar/selection)
+    const bob = Math.sin((time + unit.id * 137) * 0.004) * 1.0;
+    unit.antBody.y = bob;
 
-    // Direction dot: point toward last movement vector (only when moving/attacking)
-    if (unit.state === 'moving' || unit.state === 'attacking') {
-      unit.directionDot.setPosition(unit.lastDx * unit.radius * 0.55, unit.lastDy * unit.radius * 0.55 + bob);
-      unit.directionDot.setVisible(true);
-    } else {
-      unit.directionDot.setVisible(false);
-    }
+    // Rotér ant-body til å peke i bevegelsesretning (følehorn fremover)
+    unit.antBody.rotation = Math.atan2(unit.lastDy, unit.lastDx);
 
     // HP bar — only shown when damaged
     const maxW = unit.type === 'soldier' ? 24 : 18;
@@ -453,18 +658,20 @@ export class GameScene extends Phaser.Scene {
       const fdx = target.x - unit.x; const fdy = target.y - unit.y; const fd = Math.hypot(fdx, fdy) || 1;
       unit.lastDx = fdx / fd; unit.lastDy = fdy / fd;
 
-      // Projectile + impact
-      const projColor = unit.faction === 'player' ? 0x88ccff : 0xff9966;
+      // Projectile + impact (maursyre-sprut)
+      const projColor = unit.faction === 'player'
+        ? THEME.ATTACK_PROJECTILE_PLAYER
+        : THEME.ATTACK_PROJECTILE_AI;
       this.vfx.fireProjectile(unit.x, unit.y, target.x, target.y, projColor);
       this.vfx.impact(target.x, target.y);
 
       target.hp -= unit.damage;
 
-      // Damage tint — flash white briefly
+      // Damage tint — flash white briefly across all visible segments
       if (isUnit(target)) {
-        target.body.setFillStyle(0xffffff);
+        for (const s of target.segments) s.setFillStyle(0xffffff);
         this.time.delayedCall(80, () => {
-          if (!target.dead) target.body.setFillStyle(target.bodyColor);
+          if (!target.dead) for (const s of target.segments) s.setFillStyle(target.bodyColor);
         });
       } else {
         target.body.setFillStyle(0xffffff);
@@ -602,15 +809,69 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer) {
-    if (!this.pointerIsDown) return;
-    const dx = pointer.x - this.dragStart.x;
-    const dy = pointer.y - this.dragStart.y;
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-      this.isDragging = true;
-      const minX = Math.min(pointer.x, this.dragStart.x);
-      const minY = Math.min(pointer.y, this.dragStart.y);
-      this.dragRect.setPosition(minX, minY).setSize(Math.abs(dx), Math.abs(dy)).setVisible(true);
+    if (this.pointerIsDown) {
+      const dx = pointer.x - this.dragStart.x;
+      const dy = pointer.y - this.dragStart.y;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        this.isDragging = true;
+        const minX = Math.min(pointer.x, this.dragStart.x);
+        const minY = Math.min(pointer.y, this.dragStart.y);
+        this.dragRect.setPosition(minX, minY).setSize(Math.abs(dx), Math.abs(dy)).setVisible(true);
+      }
+      this.hoverGfx.clear();
+      return;
     }
+    this.updateHover(pointer);
+  }
+
+  private updateHover(pointer: Phaser.Input.Pointer) {
+    this.hoverGfx.clear();
+
+    // Egen enhet → hvit ring (select-hint)
+    const own = this.hitUnit(pointer, 'player');
+    if (own) {
+      this.hoverGfx.lineStyle(2, 0xffffff, 0.9);
+      this.hoverGfx.strokeCircle(own.x, own.y, own.radius + 4);
+      this.input.setDefaultCursor('pointer');
+      return;
+    }
+
+    // Fiende-enhet → rød ring (attack-hint, krever utvalg)
+    const foe = this.hitUnit(pointer, 'ai');
+    if (foe) {
+      const color = this.selectedUnits.some(u => u.type === 'soldier') ? 0xff5544 : 0xaa6655;
+      this.hoverGfx.lineStyle(2, color, 0.9);
+      this.hoverGfx.strokeCircle(foe.x, foe.y, foe.radius + 4);
+      this.input.setDefaultCursor('crosshair');
+      return;
+    }
+
+    // Bygninger / mine
+    type CursorHint = 'pointer' | 'default';
+    const buildings: { b: BuildingData; tint: number; cur: CursorHint }[] = [
+      { b: this.playerBarracks, tint: 0x88c0ff, cur: 'pointer' },
+      { b: this.aiBase, tint: 0xff5544, cur: 'pointer' },
+      { b: this.aiBarracks, tint: 0xff5544, cur: 'pointer' },
+    ];
+    for (const { b, tint, cur } of buildings) {
+      if (b.hp > 0 && this.hitBuilding(pointer, b)) {
+        this.hoverGfx.lineStyle(2, tint, 0.9);
+        this.hoverGfx.strokeRect(b.x - b.w / 2 - 4, b.y - b.h / 2 - 4, b.w + 8, b.h + 8);
+        this.input.setDefaultCursor(cur === 'pointer' ? 'pointer' : 'default');
+        return;
+      }
+    }
+    for (const m of this.mines) {
+      if (Math.abs(pointer.x - m.x) < m.w / 2 + 6 && Math.abs(pointer.y - m.y) < m.h / 2 + 6) {
+        const tint = this.selectedUnits.some(u => u.type === 'worker') ? 0xddff88 : 0xaadd77;
+        this.hoverGfx.lineStyle(2, tint, 0.9);
+        this.hoverGfx.strokeRect(m.x - m.w / 2 - 4, m.y - m.h / 2 - 4, m.w + 8, m.h + 8);
+        this.input.setDefaultCursor('pointer');
+        return;
+      }
+    }
+
+    this.input.setDefaultCursor('');
   }
 
   private onPointerUp(pointer: Phaser.Input.Pointer) {
@@ -639,11 +900,14 @@ export class GameScene extends Phaser.Scene {
     // Assign workers to mine
     for (const mine of this.mines) {
       if (Math.abs(pointer.x - mine.x) < mine.w / 2 + 6 && Math.abs(pointer.y - mine.y) < mine.h / 2 + 6) {
-        for (const u of this.selectedUnits.filter(u => u.type === 'worker')) {
+        const workers = this.selectedUnits.filter(u => u.type === 'worker');
+        if (workers.length === 0) return;
+        for (const u of workers) {
           u.mineTarget = mine;
           u.state = 'moving';
           u.moveTarget = { x: mine.x, y: mine.y };
         }
+        this.spawnCommandRipple(mine.x, mine.y, 0xddff88);
         return;
       }
     }
@@ -651,20 +915,26 @@ export class GameScene extends Phaser.Scene {
     // Attack enemy unit
     const enemyUnit = this.hitUnit(pointer, 'ai');
     if (enemyUnit) {
-      for (const u of this.selectedUnits.filter(u => u.type === 'soldier')) {
+      const soldiers = this.selectedUnits.filter(u => u.type === 'soldier');
+      if (soldiers.length === 0) return;
+      for (const u of soldiers) {
         u.attackTarget = enemyUnit;
         u.state = 'attacking';
       }
+      this.spawnCommandRipple(enemyUnit.x, enemyUnit.y, 0xff5544);
       return;
     }
 
     // Attack enemy building
     for (const b of [this.aiBase, this.aiBarracks]) {
       if (b.hp > 0 && Math.abs(pointer.x - b.x) < b.w / 2 + 6 && Math.abs(pointer.y - b.y) < b.h / 2 + 6) {
-        for (const u of this.selectedUnits.filter(u => u.type === 'soldier')) {
+        const soldiers = this.selectedUnits.filter(u => u.type === 'soldier');
+        if (soldiers.length === 0) return;
+        for (const u of soldiers) {
           u.attackTarget = b;
           u.state = 'attacking';
         }
+        this.spawnCommandRipple(b.x, b.y, 0xff5544);
         return;
       }
     }
@@ -677,6 +947,21 @@ export class GameScene extends Phaser.Scene {
       u.attackTarget = null;
       u.state = 'moving';
       u.moveTarget = { x: pointer.x + offset.x, y: pointer.y + offset.y };
+    });
+    this.spawnCommandRipple(pointer.x, pointer.y, 0x88ddff);
+  }
+
+  private spawnCommandRipple(x: number, y: number, color: number) {
+    const ring = this.add.arc(x, y, 8, 0, 360, false, 0x000000, 0)
+      .setStrokeStyle(2.5, color, 1)
+      .setDepth(24);
+    this.tweens.add({
+      targets: ring,
+      scale: 3,
+      alpha: 0,
+      duration: 380,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
     });
   }
 
@@ -723,38 +1008,53 @@ export class GameScene extends Phaser.Scene {
     this.closeTrainPanel();
 
     const { x, y, h } = this.playerBarracks;
-    const px = x + 90;
+    const px = x + 100;
     const py = y - h / 2 - 5;
-    const pw = 178; const ph = 68;
+    const pw = 200; const ph = 72;
 
-    const bg = this.add.rectangle(0, 0, pw, ph, 0x0d1a2a, 0.96)
-      .setStrokeStyle(1, 0x3366aa, 1);
+    const bg = this.add.rectangle(0, 0, pw, ph, 0x2a1f12, 0.96)
+      .setStrokeStyle(1, 0xb8945a, 1);
 
-    const title = this.add.text(0, -ph / 2 + 9, 'TRAIN', {
-      fontSize: '11px', color: '#3366aa', fontFamily: 'monospace', fontStyle: 'bold',
+    const title = this.add.text(0, -ph / 2 + 9, 'TREN MAUR', {
+      fontSize: '11px', color: '#d8c896', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5, 0);
 
-    const makeBtn = (label: string, yOff: number, cb: () => void) => {
-      const btn = this.add.text(-pw / 2 + 10, yOff, label, {
-        fontSize: '13px', color: '#99bbdd', fontFamily: 'monospace',
+    this.trainButtons = [];
+    const makeBtn = (baseLabel: string, key: string, cost: number, yOff: number, cb: () => void) => {
+      const btn = this.add.text(-pw / 2 + 12, yOff, '', {
+        fontSize: '13px', color: '#e6d8a6', fontFamily: 'monospace',
       }).setInteractive({ useHandCursor: true });
-      btn.on('pointerover', () => btn.setColor('#ffffff'));
-      btn.on('pointerout', () => btn.setColor('#99bbdd'));
+      btn.on('pointerover', () => {
+        if (this.playerGold >= cost) btn.setColor('#ffffff');
+      });
+      btn.on('pointerout', () => this.refreshTrainButtons());
       btn.on('pointerdown', (p: Phaser.Input.Pointer) => { p.event.stopPropagation(); cb(); });
+      this.trainButtons.push({ btn, cost, baseLabel, key });
       return btn;
     };
 
-    const wBtn = makeBtn(`Worker   ${CONFIG.WORKER_COST}g`, -8, () => this.trainUnit('worker'));
-    const sBtn = makeBtn(`Soldier  ${CONFIG.SOLDIER_COST}g`, 14, () => this.trainUnit('soldier'));
+    const wBtn = makeBtn('Arbeider', 'Q', CONFIG.WORKER_COST, -10, () => this.trainUnit('worker'));
+    const sBtn = makeBtn('Soldat',   'E', CONFIG.SOLDIER_COST, 14, () => this.trainUnit('soldier'));
 
     this.trainPanel = this.add.container(px, py, [bg, title, wBtn, sBtn]).setDepth(30);
     this.trainPanelBounds = new Phaser.Geom.Rectangle(px - pw / 2, py - ph / 2, pw, ph);
+    this.refreshTrainButtons();
+  }
+
+  private refreshTrainButtons() {
+    for (const { btn, cost, baseLabel, key } of this.trainButtons) {
+      const canAfford = this.playerGold >= cost;
+      btn.setText(`[${key}] ${baseLabel.padEnd(9)} ${cost} mat`);
+      btn.setColor(canAfford ? '#e6d8a6' : '#6a5a3a');
+      btn.setAlpha(canAfford ? 1 : 0.6);
+    }
   }
 
   private closeTrainPanel() {
     this.trainPanel?.destroy();
     this.trainPanel = null;
     this.trainPanelBounds = null;
+    this.trainButtons = [];
   }
 
   private trainUnit(type: 'worker' | 'soldier') {
@@ -765,6 +1065,7 @@ export class GameScene extends Phaser.Scene {
     this.statsTrained += 1;
     const { x, y } = this.playerBarracks;
     this.spawnUnit('player', type, x + Phaser.Math.Between(-22, 22), y + Phaser.Math.Between(-22, 22));
+    if (this.trainPanel) this.refreshTrainButtons();
   }
 
   // ── AI ───────────────────────────────────────────────────────────────────
@@ -879,8 +1180,8 @@ export class GameScene extends Phaser.Scene {
         if (w.faction === 'player') { this.playerGold += CONFIG.GOLD_PER_TICK; playerGain += CONFIG.GOLD_PER_TICK; this.statsGoldEarned += CONFIG.GOLD_PER_TICK; }
         else { this.aiGold += CONFIG.GOLD_PER_TICK; aiGain += CONFIG.GOLD_PER_TICK; }
       }
-      if (playerGain > 0) this.vfx.floatText(mine.x - 8, mine.y - 24, `+${playerGain}`, '#ffd700');
-      if (aiGain > 0) this.vfx.floatText(mine.x + 8, mine.y - 24, `+${aiGain}`, '#ff9966');
+      if (playerGain > 0) this.vfx.floatText(mine.x - 8, mine.y - 28, `+${playerGain}`, '#ddff88');
+      if (aiGain > 0) this.vfx.floatText(mine.x + 8, mine.y - 28, `+${aiGain}`, '#ffcc88');
     }
   }
 
@@ -909,8 +1210,8 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: overlay, fillAlpha: 0.7, duration: 350 });
 
     // Title with scale-bounce
-    const titleColor = result === 'won' ? '#ffd700' : '#ff5555';
-    const title = this.add.text(W / 2, H / 2 - 60, result === 'won' ? 'VICTORY' : 'DEFEAT', {
+    const titleColor = result === 'won' ? '#ffe080' : '#ff5544';
+    const title = this.add.text(W / 2, H / 2 - 60, result === 'won' ? 'SEIER' : 'TAPT', {
       fontSize: '80px', color: titleColor,
       fontFamily: 'monospace', fontStyle: 'bold',
       stroke: '#000000', strokeThickness: 6,
@@ -931,14 +1232,14 @@ export class GameScene extends Phaser.Scene {
     const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
     const stats = this.add.text(
       W / 2, H / 2 + 30,
-      `Soldiers trained: ${this.statsTrained}    Gold mined: ${this.statsGoldEarned}g    Time: ${timeStr}`,
-      { fontSize: '16px', color: '#bbccdd', fontFamily: 'monospace' },
+      `Maur trent: ${this.statsTrained}    Mat samlet: ${this.statsGoldEarned}    Tid: ${timeStr}`,
+      { fontSize: '16px', color: '#d8c896', fontFamily: 'monospace' },
     ).setOrigin(0.5).setDepth(51).setAlpha(0);
     this.tweens.add({ targets: stats, alpha: 1, duration: 500, delay: 600 });
 
     // Restart hint
-    const hint = this.add.text(W / 2, H / 2 + 70, 'Press  R  to restart', {
-      fontSize: '20px', color: '#888899', fontFamily: 'monospace',
+    const hint = this.add.text(W / 2, H / 2 + 70, 'Trykk  R  for å starte på nytt', {
+      fontSize: '20px', color: '#a89878', fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(51).setAlpha(0);
     this.tweens.add({ targets: hint, alpha: 1, duration: 500, delay: 800 });
 
