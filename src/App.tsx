@@ -1,16 +1,22 @@
 import { GameCanvas } from './components/GameCanvas';
+import { HudOverlay } from './components/HudOverlay';
+import { Tutorial } from './components/Tutorial';
 
 export default function App() {
   return (
     <div style={{
+      position: 'relative',
       width: '100vw',
       height: '100vh',
+      overflow: 'hidden',
       background: 'radial-gradient(ellipse at center, #1a2638 0%, #0a1018 70%, #05080d 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
     }}>
       <GameCanvas />
+      <HudOverlay />
+      <Tutorial />
       <div
         id="game-metrics"
         data-state="running"

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { loadAllSfx } from '../audio';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -6,7 +7,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    // All assets are programmatic — nothing to load
+    // M1.4 — SFX-filer i public/sfx/. Manglende filer er tolerert (se audio.ts).
+    loadAllSfx(this);
   }
 
   create() {
