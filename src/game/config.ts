@@ -21,7 +21,7 @@ export const CONFIG = {
 
   // AI — these are the primary tuning targets for the playtest loop
   AI_DECISION_INTERVAL: 3000,
-  AI_AGGRESSION_THRESHOLD: 2,
+  AI_AGGRESSION_THRESHOLD: 3,
   AI_WORKER_TARGET: 2,
   AI_UNIT_PRIORITY: 'balanced' as UnitPriority,
 
