@@ -2364,8 +2364,16 @@ export class GameScene extends Phaser.Scene {
     );
 
     if (threats.length > 0) {
-      // Defensive: each soldier targets the nearest incoming threat
-      for (const s of playerSoldiers) {
+      // Defenders = soldiers closest to base; rest become surplus that can press the attack
+      // when we have ≥2× the threat count and at least the aggression threshold above defense need.
+      const defendersNeeded = Math.min(playerSoldiers.length, threats.length * 2);
+      const sortedByBaseDist = [...playerSoldiers].sort((a, b) =>
+        Phaser.Math.Distance.Between(a.x, a.y, this.playerBase.x, this.playerBase.y) -
+        Phaser.Math.Distance.Between(b.x, b.y, this.playerBase.x, this.playerBase.y),
+      );
+      const defenders = sortedByBaseDist.slice(0, defendersNeeded);
+      const surplus = sortedByBaseDist.slice(defendersNeeded);
+      for (const s of defenders) {
         let nearest: UnitData | null = null;
         let nearestDist = Infinity;
         for (const t of threats) {
@@ -2373,6 +2381,13 @@ export class GameScene extends Phaser.Scene {
           if (d < nearestDist) { nearest = t; nearestDist = d; }
         }
         if (nearest) { s.attackTarget = nearest; s.state = 'attacking'; }
+      }
+      if (surplus.length >= CONFIG.PLAYER_AGGRESSION_THRESHOLD) {
+        for (const s of surplus) {
+          const t = s.attackTarget;
+          const hasLiveTarget = t !== null && t.hp > 0 && !('dead' in t && (t as UnitData).dead);
+          if (!hasLiveTarget) { s.attackTarget = this.aiBase; s.state = 'attacking'; }
+        }
       }
     } else if (playerSoldiers.length >= CONFIG.PLAYER_AGGRESSION_THRESHOLD) {
       // Offensive: don't interrupt soldiers already fighting a live target
