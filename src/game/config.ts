@@ -25,15 +25,41 @@ export const CONFIG = {
   AI_WORKER_TARGET: 2,
   AI_UNIT_PRIORITY: 'balanced' as UnitPriority,
 
-  // Map
-  MAP_WIDTH: 1280,
-  MAP_HEIGHT: 720,
+  // World — faste verden-dimensjoner, uavhengig av viewport. Camera scroller over denne.
+  MAP_WIDTH: 2560,
+  MAP_HEIGHT: 1440,
+
+  // Viewport (canvas) — settes av PhaserGame.syncConfigToViewport() ved oppstart/resize.
+  VIEWPORT_WIDTH: 1280,
+  VIEWPORT_HEIGHT: 720,
+
+  // Camera
+  CAMERA_SCROLL_SPEED: 600,    // px/s ved WASD eller edge-scroll
+  CAMERA_EDGE_THRESHOLD: 24,   // px fra viewport-kant før edge-scroll triggrer
+
+  // Mines — contested logikk
+  MINE_CONTEST_RADIUS: 80,     // px — fiende-units innenfor blokkerer gull-tick
+
+  // Broer (T1-C/T1-B)
+  BRIDGE_HP: 150,
+  BRIDGE_PASS_RADIUS: 50,      // px — units innenfor denne radius rundt en levende bro kan krysse elv
 
   // Demo / autonomous play — loop sets this to true, game restores to false
   DEMO_MODE: false,
-  PLAYER_AGGRESSION_THRESHOLD: 4,
-  PLAYER_WORKER_TARGET: 2,
+  PLAYER_AGGRESSION_THRESHOLD: 5,
+  PLAYER_WORKER_TARGET: 3,
   PLAYER_DECISION_INTERVAL: 3000,
+
+  // M1 — pause + hastighet
+  TIME_SCALES: [1, 2, 3] as const,
+  DEFAULT_TIME_SCALE: 1,
+
+  // M1 — fiende-varsel
+  ENEMY_NEAR_RADIUS: 400,        // px — soldater innenfor denne distansen til player-base trigger varsel
+  ENEMY_ALERT_INTERVAL: 500,     // ms — hvor ofte vi sjekker
+
+  // M1 — audio
+  AUDIO_DEFAULT_VOLUME: 0.6,
 };
 
 // Ant-tema visuell palett — alle rendering-konstanter samlet her
@@ -59,6 +85,20 @@ export const THEME = {
   BASE_HIGHLIGHT_AI: 0xa05528,
   BASE_ENTRANCE_COLOR: 0x140a04,
   BARRACKS_EGG_COLOR: 0xf5e8c8,
+  // Maurtue tekstur — granulat, kvist, barnåler, forstyrret jord
+  SOIL_GRAIN_PLAYER: [0x8a6638, 0x5a3a1c, 0xa07a44, 0x4a2c14],
+  SOIL_GRAIN_AI: [0x9a4a22, 0x5a2010, 0xb86238, 0x4a1808],
+  PINE_NEEDLE_COLOR: 0x4a3a1a,
+  PINE_NEEDLE_LIGHT: 0x7a5a2a,
+  TWIG_COLOR: 0x3a2410,
+  DISTURBED_SOIL_PLAYER: 0x4a3220,
+  DISTURBED_SOIL_AI: 0x5a2818,
+
+  // Småblomster / kløver-tuer
+  CLOVER_LEAF: 0x4a8a3a,
+  FLOWER_WHITE: 0xf0eed8,
+  FLOWER_YELLOW: 0xf0d048,
+  FLOWER_PINK: 0xd884a0,
 
   // Bladlus-farm
   APHID_LEAF_COLOR: 0x3a7a2a,
@@ -81,4 +121,17 @@ export const THEME = {
   ATTACK_PROJECTILE_AI: 0xff9944,
   DUST_TINTS: [0x6a5a3a, 0x8a7a5a, 0x4a3a22],
   SPARK_TINTS: [0xccff88, 0xddee99, 0xffffff],
+
+  // HP-bar farger (Phaser-rendered bars over units/buildings). Matcher CSS-paletten i HudOverlay.
+  HP_BAR_HIGH: 0x4caf50,   // > 66%
+  HP_BAR_MED:  0xffc107,   // 33–66%
+  HP_BAR_LOW:  0xf44336,   // < 33%
+
+  // Camera postFX — applied once i GameScene.create(). Hold bloom lav så
+  // ant-temaet ikke blir overstrålt; vignett gir cinematisk innramming.
+  FX_BLOOM_THRESHOLD: 0.55,
+  FX_BLOOM_BLUR_RADIUS: 6,
+  FX_BLOOM_BLUR_STEPS: 4,
+  FX_BLOOM_BLUR_QUALITY: 1,
+  FX_BLOOM_BLEND_AMOUNT: 0.65,
 };
