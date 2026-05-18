@@ -46,7 +46,7 @@ export const CONFIG = {
 
   // Demo / autonomous play — loop sets this to true, game restores to false
   DEMO_MODE: false,
-  PLAYER_AGGRESSION_THRESHOLD: 5,
+  PLAYER_AGGRESSION_THRESHOLD: 3,
   PLAYER_WORKER_TARGET: 3,
   PLAYER_DECISION_INTERVAL: 3000,
 
