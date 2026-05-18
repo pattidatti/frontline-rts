@@ -106,7 +106,7 @@
     { "id": 1, "title": "HP bar colors — green/yellow/red based on percentage", "status": "pending" },
     { "id": 2, "title": "Second mine — add a neutral mine in the center of the map at (640, 360)", "status": "pending" },
     { "id": 3, "title": "Soldier upgrades — pay gold at barracks to increase soldier damage by 10", "status": "pending" },
-    { "id": 4, "title": "Tower building — players can build defensive towers near base for 80 gold", "status": "pending" },
+    { "id": 4, "title": "Tower building — players can build defensive towers near base for 80 gold", "status": "done" },
     { "id": 5, "title": "Fog of war — units only reveal terrain within vision radius 150px, rest darkened", "status": "pending" },
 
     { "id": 6,  "tier": "T1-A", "title": "Larger map with camera scroll — expand map to 2560×1440, add WASD/mouse-edge camera panning and minimap", "status": "done" },
@@ -125,7 +125,7 @@
     { "id": 16, "tier": "T4-B", "title": "Unique maps per level — Level 1: open field (current), Level 2: Elvedalen (1 river 2 bridges 3 mines), Level 3: Øydelta (2 rivers 5 mines), Level 4: Fjellpass (narrow corridor 4 mines), Level 5: Labyrinten (3 rivers 6 mines)", "status": "pending" },
     { "id": 17, "tier": "T4-C", "title": "Per-level AI difficulty — Level 1: AI_AGGRESSION_THRESHOLD 4; Level 2–3: threshold 3 faster response; Level 4–5: threshold 2 uses ranged+heavy prioritizes bridge control", "status": "pending" },
 
-    { "id": 18, "tier": "T5-B", "title": "Unit formations — press F to arrange selected soldiers in a line formation; useful for bridge assaults", "status": "pending" },
+    { "id": 18, "tier": "T5-B", "title": "Unit formations — press F to arrange selected soldiers in a line formation; useful for bridge assaults", "status": "done" },
     { "id": 19, "tier": "T5-C", "title": "Day/night cycle — 3-minute cycle: day → dusk → night; at night fog of war radius reduced 30%; only visual effect + fog bonus", "status": "pending" },
     { "id": 20, "tier": "T5-D", "title": "Extended end-screen stats — show units trained, units lost, mines held, gold earned, time; save high score per level to localStorage", "status": "pending" },
     { "id": 21, "tier": "T5-E", "title": "Neutral raiders — neutral ant-raid spawns from map edge every 90s; attacks nearest unit regardless of faction; drops 50g on kill; creates shared threat", "status": "pending" }
