@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG, THEME } from '../config';
 import { VFXManager } from '../vfx';
-import { hudBridge, type HudState, type HudCommand, type HudUnit, type HudBuilding, type HudSelection } from '../hudBridge';
+import { hudBridge, type HudState, type HudCommand, type HudUnit, type HudBuilding, type HudSelection, type HudBuildMode, type HudWaveState, type TowerKind } from '../hudBridge';
 import { pointInPolygon, segmentCrossesPolyline } from '../geom';
 import { playSfx, LoopingSfx } from '../audio';
 
@@ -40,11 +40,13 @@ interface UnitData {
   selectionTween: Phaser.Tweens.Tween | null;
   radius: number;
   lastDx: number; lastDy: number;
+  /** M2.1 — webber-tower slow. ms-tidsstempel; speed halveres så lenge time < slowedUntil. */
+  slowedUntil: number;
 }
 
 interface BuildingData {
   id: number;
-  kind: 'base' | 'barracks' | 'mine' | 'bridge';
+  kind: 'base' | 'barracks' | 'mine' | 'bridge' | 'tower';
   faction: 'player' | 'ai' | 'neutral';
   x: number; y: number; w: number; h: number;
   hp: number; maxHp: number;
@@ -57,6 +59,18 @@ interface BuildingData {
   label?: Phaser.GameObjects.Text;
   /** Kun for 'bridge'. Container med alle bro-visuals — skjules ved død. */
   bridgeContainer?: Phaser.GameObjects.Container;
+  /** Kun for 'tower'. Skjuler hele tårn-visualet ved død. */
+  towerContainer?: Phaser.GameObjects.Container;
+  /** Kun for 'tower'. Type-spesifikke parametere. */
+  tower?: {
+    type: TowerKind;
+    range: number;
+    damage: number;
+    fireRate: number;
+    splash: number;
+    slow: number;
+    lastFireAt: number;
+  };
 }
 
 type MineControl = 'player' | 'ai' | 'contested' | null;
@@ -142,6 +156,24 @@ export class GameScene extends Phaser.Scene {
   // M1.4 — looping base-alarm (under 50 % HP)
   private baseAlarmLoop: LoopingSfx | null = null;
 
+  // M2.1 — Tower-bygging
+  private towers: BuildingData[] = [];
+  private buildMode: {
+    towerType: TowerKind;
+    ghostBody: Phaser.GameObjects.Graphics;
+    ghostRange: Phaser.GameObjects.Graphics;
+    valid: boolean;
+  } | null = null;
+  private buildRadiusRing: Phaser.GameObjects.Graphics | null = null;
+
+  // M2.2 — Wave Defence
+  private waveActive: boolean = false;
+  private currentWaveIndex: number = -1;   // -1 før første bølge
+  private nextWaveAt: number = 0;          // ms-tidsstempel (this.time.now)
+  private waveSpawnQueue: number = 0;      // antall AI-soldater igjen å spawne i denne bølgen
+  private waveSpawnTimer: number = 0;      // ms til neste spawn i bølgen
+  private wavesCleared: boolean = false;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -173,6 +205,15 @@ export class GameScene extends Phaser.Scene {
     this.prePauseSpeed = CONFIG.DEFAULT_TIME_SCALE;
     this.lastEnemyAlertAt = 0;
     this.currentAlert = null;
+    this.towers = [];
+    this.buildMode = null;
+    this.buildRadiusRing = null;
+    this.waveActive = false;
+    this.currentWaveIndex = -1;
+    this.nextWaveAt = 0;
+    this.waveSpawnQueue = 0;
+    this.waveSpawnTimer = 0;
+    this.wavesCleared = false;
     if (this.hudCommandUnsub) { this.hudCommandUnsub(); this.hudCommandUnsub = null; }
 
     const W = CONFIG.MAP_WIDTH;
@@ -375,6 +416,7 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-Z', () => this.selectAllOfType('soldier'));
     this.input.keyboard?.on('keydown-X', () => this.selectAllOfType('worker'));
     this.input.keyboard?.on('keydown-ESC', () => {
+      if (this.buildMode) { this.cancelBuildMode(); return; }
       this.clearSelection();
       this.clearBuildingSelection();
     });
@@ -384,6 +426,25 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-EQUALS', () => this.cycleSpeed(+1));
     this.input.keyboard?.on('keydown-MINUS', () => this.cycleSpeed(-1));
     this.input.keyboard?.on('keydown-NUMPAD_SUBTRACT', () => this.cycleSpeed(-1));
+
+    // M2.1 — tower-bygging. T toggler build-mode (default stinger).
+    // I build-mode: 1/2/3 bytter tower-type, Esc/høyreklikk avbryter.
+    this.input.keyboard?.on('keydown-T', () => {
+      if (this.buildMode) this.cancelBuildMode();
+      else this.startBuildMode('stinger');
+    });
+    this.input.keyboard?.on('keydown-ONE', () => {
+      if (this.buildMode) this.startBuildMode('stinger');
+    });
+    this.input.keyboard?.on('keydown-TWO', () => {
+      if (this.buildMode) this.startBuildMode('webber');
+    });
+    this.input.keyboard?.on('keydown-THREE', () => {
+      if (this.buildMode) this.startBuildMode('spitter');
+    });
+
+    // M2.3 — choke-formasjon (F)
+    this.input.keyboard?.on('keydown-F', () => this.formationLine());
 
     // WASD + piltaster for kamera-scroll. A-konflikten med select-all-soldiers er
     // løst ved å fjerne A-hotkeyen — SPACE er fortsatt select-all-soldiers.
@@ -430,6 +491,21 @@ export class GameScene extends Phaser.Scene {
 
     // DOM metrics bridge
     this.metricsEl = document.getElementById('game-metrics');
+
+    // M2.2 — Wave-modus: URL-param `?mode=wave` overstyrer CONFIG.WAVE_MODE.enabled
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        const mode = url.searchParams.get('mode');
+        if (mode === 'wave') (CONFIG.WAVE_MODE as { enabled: boolean }).enabled = true;
+        if (mode === 'classic') (CONFIG.WAVE_MODE as { enabled: boolean }).enabled = false;
+      } catch { /* noop */ }
+    }
+    if (CONFIG.WAVE_MODE.enabled) {
+      // Wave-mode: skjul AI-base for spilleren — bare relevant at spilleren overlever
+      // første bølge starter etter waves[0].delay
+      this.nextWaveAt = this.time.now + CONFIG.WAVE_MODE.waves[0].delay;
+    }
 
     // VFX manager (must be created after BootScene generated the spark texture)
     this.vfx = new VFXManager(this);
@@ -634,6 +710,7 @@ export class GameScene extends Phaser.Scene {
       : b.kind === 'barracks' ? (b.faction === 'player' ? 'BARAKKE' : 'FIENDE-BARAKKE')
       : b.kind === 'mine'   ? 'BLADLUSFARM'
       : b.kind === 'bridge' ? 'BRO'
+      : b.kind === 'tower'  ? (b.tower?.type === 'webber' ? 'NETT-TÅRN' : b.tower?.type === 'spitter' ? 'SPYTT-TÅRN' : 'SPYDD-TÅRN')
       : '';
     if (!text) return;
     const color = b.faction === 'player' ? '#cfe3a3'
@@ -797,6 +874,193 @@ export class GameScene extends Phaser.Scene {
     return mine;
   }
 
+  /** M2.1 — bygg en tower for spilleren. Tegnes som steinsokkel + farget topp.  */
+  private createTower(type: TowerKind, x: number, y: number): BuildingData {
+    const spec = CONFIG.TOWER_TYPES[type];
+    const w = 36, h = 44;
+
+    // Drop shadow
+    const shadow = this.add.ellipse(2, h * 0.42, w * 1.1, h * 0.28, 0x000000, 0.45);
+
+    // Steinsokkel
+    const base = this.add.ellipse(0, h * 0.18, w, h * 0.45, 0x6a5a3a)
+      .setStrokeStyle(1.5, 0x2a1f12, 0.85);
+
+    // Skaft
+    const shaft = this.add.rectangle(0, -h * 0.05, w * 0.55, h * 0.55, 0x8a7a52)
+      .setStrokeStyle(1.2, 0x3a2a18, 0.85);
+
+    // Topp-disk (faget farge etter tower-type)
+    const top = this.add.circle(0, -h * 0.35, w * 0.42, spec.color)
+      .setStrokeStyle(1.4, 0x1a1208, 1);
+
+    // Liten "kanon"-spiss (peker oppover)
+    const muzzle = this.add.triangle(0, -h * 0.55, -3, 0, 3, 0, 0, -7, spec.color)
+      .setStrokeStyle(1, 0x1a1208, 0.85);
+
+    const container = this.add.container(x, y, [shadow, base, shaft, top, muzzle]).setDepth(3);
+
+    // Hit body (skjult — bare ref for BuildingData)
+    const body = this.add.ellipse(x, y, w, h, 0x000000, 0).setDepth(3);
+
+    const hpBg = this.add.rectangle(x, y - h / 2 - 6, 40, 4, 0x222222).setDepth(8).setVisible(false);
+    const hpFg = this.add.rectangle(x - 20, y - h / 2 - 6, 40, 4, 0x66bb44).setOrigin(0, 0.5).setDepth(8).setVisible(false);
+
+    const b: BuildingData = {
+      id: this.nextId++, kind: 'tower', faction: 'player',
+      x, y, w, h,
+      hp: spec.hp, maxHp: spec.hp,
+      body, bodyColor: spec.color, hpBg, hpFg,
+      towerContainer: container,
+      tower: {
+        type,
+        range: spec.range,
+        damage: spec.damage,
+        fireRate: spec.fireRate,
+        splash: spec.splash,
+        slow: spec.slow,
+        lastFireAt: 0,
+      },
+    };
+    this.attachBuildingLabel(b);
+    this.buildings.push(b);
+    this.towers.push(b);
+    return b;
+  }
+
+  /** Kan en tower plasseres på (x,y)? */
+  private canPlaceTower(x: number, y: number): boolean {
+    if (!this.playerBase || this.playerBase.hp <= 0) return false;
+    const dFromBase = Phaser.Math.Distance.Between(x, y, this.playerBase.x, this.playerBase.y);
+    if (dFromBase > CONFIG.TOWER_BUILD_RADIUS) return false;
+    // Innenfor verden
+    if (x < 40 || x > CONFIG.MAP_WIDTH - 40 || y < 40 || y > CONFIG.MAP_HEIGHT - 40) return false;
+    // Ikke på elv
+    if (this.riverStateAt(x, y) !== 'land') return false;
+    // Klaring til andre bygninger
+    const c = CONFIG.TOWER_PLACE_CLEARANCE;
+    for (const b of this.buildings) {
+      if (b.dead || b.hp <= 0) continue;
+      if (Phaser.Math.Distance.Between(x, y, b.x, b.y) < c) return false;
+    }
+    return true;
+  }
+
+  /** M2.1 — start build-mode for valgt tower-type. */
+  private startBuildMode(type: TowerKind) {
+    if (this.gameState !== 'running') return;
+    if (this.playerBase.hp <= 0) return;
+    this.cancelBuildMode();
+    const ghostBody = this.add.graphics().setDepth(24);
+    const ghostRange = this.add.graphics().setDepth(23);
+    this.buildMode = { towerType: type, ghostBody, ghostRange, valid: false };
+    // Tegn build-radius rundt basen
+    if (!this.buildRadiusRing) {
+      this.buildRadiusRing = this.add.graphics().setDepth(22);
+    }
+    this.buildRadiusRing.clear();
+    this.buildRadiusRing.lineStyle(2, 0xddcc88, 0.55);
+    this.buildRadiusRing.strokeCircle(this.playerBase.x, this.playerBase.y, CONFIG.TOWER_BUILD_RADIUS);
+    // Initiel ghost-tegning kommer i pointermove
+  }
+
+  private cancelBuildMode() {
+    if (!this.buildMode) return;
+    this.buildMode.ghostBody.destroy();
+    this.buildMode.ghostRange.destroy();
+    this.buildMode = null;
+    if (this.buildRadiusRing) {
+      this.buildRadiusRing.destroy();
+      this.buildRadiusRing = null;
+    }
+  }
+
+  private updateBuildGhost(w: Vec2) {
+    if (!this.buildMode) return;
+    const spec = CONFIG.TOWER_TYPES[this.buildMode.towerType];
+    const ok = this.canPlaceTower(w.x, w.y) && this.playerGold >= spec.cost;
+    this.buildMode.valid = ok;
+    const color = ok ? 0x66dd66 : 0xee5544;
+
+    // Ghost body — kvadrat med diamant-overlegg
+    const g = this.buildMode.ghostBody;
+    g.clear();
+    g.lineStyle(2, color, 0.95);
+    g.fillStyle(color, 0.18);
+    g.fillRect(w.x - 18, w.y - 22, 36, 44);
+    g.strokeRect(w.x - 18, w.y - 22, 36, 44);
+    g.fillStyle(spec.color, 0.55);
+    g.fillCircle(w.x, w.y - 14, 14);
+
+    // Range-ring
+    const rg = this.buildMode.ghostRange;
+    rg.clear();
+    rg.lineStyle(1.5, color, 0.55);
+    rg.strokeCircle(w.x, w.y, spec.range);
+  }
+
+  /** Plasser tower hvis posisjon er gyldig. Returnerer true ved suksess. */
+  private placeTower(w: Vec2): boolean {
+    if (!this.buildMode) return false;
+    const spec = CONFIG.TOWER_TYPES[this.buildMode.towerType];
+    if (!this.canPlaceTower(w.x, w.y) || this.playerGold < spec.cost) return false;
+    this.playerGold -= spec.cost;
+    this.createTower(this.buildMode.towerType, w.x, w.y);
+    this.spawnCommandRipple(w.x, w.y, 0xddff88);
+    playSfx(this, 'train', { volume: 0.5 });
+    return true;
+  }
+
+  /** Auto-fire fra alle towers — kalt fra update(). */
+  private updateTowers(time: number) {
+    for (const tower of this.towers) {
+      if (tower.dead || tower.hp <= 0 || !tower.tower) continue;
+      const t = tower.tower;
+      if (time - t.lastFireAt < t.fireRate) continue;
+
+      // Finn nærmeste fiende-unit innenfor range
+      let target: UnitData | null = null;
+      let bestDist = t.range;
+      for (const u of this.units) {
+        if (u.dead || u.faction !== 'ai') continue;
+        const d = Phaser.Math.Distance.Between(tower.x, tower.y, u.x, u.y);
+        if (d < bestDist) { target = u; bestDist = d; }
+      }
+      if (!target) continue;
+
+      t.lastFireAt = time;
+      this.vfx.fireProjectile(tower.x, tower.y - 14, target.x, target.y, t.type === 'spitter' ? 0x8acc6a : t.type === 'webber' ? 0xc8c8e8 : THEME.ATTACK_PROJECTILE_PLAYER);
+      this.vfx.impact(target.x, target.y);
+      playSfx(this, 'attack', { volume: 0.15 });
+
+      // Damage selve målet
+      this.applyTowerHit(target, t.damage, t.slow, time);
+
+      // Splash (spitter)
+      if (t.splash > 0) {
+        for (const u of this.units) {
+          if (u === target || u.dead || u.faction !== 'ai') continue;
+          const d = Phaser.Math.Distance.Between(target.x, target.y, u.x, u.y);
+          if (d <= t.splash) this.applyTowerHit(u, Math.round(t.damage * 0.6), t.slow, time);
+        }
+      }
+    }
+  }
+
+  private applyTowerHit(target: UnitData, damage: number, slow: number, time: number) {
+    target.hp -= damage;
+    if (slow > 0) target.slowedUntil = time + CONFIG.TOWER_SLOW_DURATION;
+    // Flash white briefly
+    for (const s of target.segments) s.setFillStyle(0xffffff);
+    this.time.delayedCall(80, () => {
+      if (!target.dead) for (const s of target.segments) s.setFillStyle(target.bodyColor);
+    });
+    if (target.hp <= 0) {
+      playSfx(this, 'unit-die', { volume: 0.3 });
+      this.removeUnit(target);
+    }
+  }
+
   private spawnUnit(faction: 'player' | 'ai', type: 'worker' | 'soldier', x: number, y: number): UnitData {
     const isSoldier = type === 'soldier';
     const isPlayer = faction === 'player';
@@ -920,6 +1184,7 @@ export class GameScene extends Phaser.Scene {
       bodyColor, hpBg, hpFg, selectionRing: selRing,
       selectionTween: null, radius: r,
       lastDx: isPlayer ? 1 : -1, lastDy: 0,
+      slowedUntil: 0,
     };
 
     this.units.push(unit);
@@ -969,8 +1234,20 @@ export class GameScene extends Phaser.Scene {
       if (!unit.dead) this.updateUnit(unit, time, dt);
     }
 
-    if (this.playerBase.hp <= 0) { this.endGame('lost'); return; }
-    if (this.aiBase.hp <= 0) { this.endGame('won'); return; }
+    // M2.1 — towers fyrer på fiende-units
+    this.updateTowers(time);
+
+    // M2.2 — wave-modus oppdaterer spawns og sjekker seier
+    if (CONFIG.WAVE_MODE.enabled) {
+      this.updateWaves(time, delta);
+      if (this.playerBase.hp <= 0) { this.endGame('lost'); return; }
+      if (this.wavesCleared && !this.waveActive && this.units.every(u => u.faction !== 'ai' || u.dead)) {
+        this.endGame('won'); return;
+      }
+    } else {
+      if (this.playerBase.hp <= 0) { this.endGame('lost'); return; }
+      if (this.aiBase.hp <= 0) { this.endGame('won'); return; }
+    }
 
     // M1.4 — base-alarm når egen base under 50 % HP
     if (this.baseAlarmLoop) {
@@ -1129,8 +1406,11 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(220, 0.005);
     this.vfx.dust(b.x, b.y, 14);
     // Broer kollapser containeren (planker faller), basers body fader.
+    // Towers (M2.1) faller på samme måte som broer.
     const target: Phaser.GameObjects.GameObject =
-      b.kind === 'bridge' && b.bridgeContainer ? b.bridgeContainer : b.body;
+      b.kind === 'bridge' && b.bridgeContainer ? b.bridgeContainer
+      : b.kind === 'tower' && b.towerContainer ? b.towerContainer
+      : b.body;
     this.tweens.add({
       targets: target,
       scaleY: 0.25,
@@ -1243,7 +1523,9 @@ export class GameScene extends Phaser.Scene {
     const nx = dx / dist;
     const ny = dy / dist;
     unit.lastDx = nx; unit.lastDy = ny;
-    let step = Math.min(unit.speed * dt, dist);
+    // M2.1 — webber-slow halverer farten så lenge slowedUntil er i fremtiden
+    const speedMul = unit.slowedUntil > this.time.now ? 0.5 : 1;
+    let step = Math.min(unit.speed * speedMul * dt, dist);
 
     let newX = unit.x + nx * step;
     let newY = unit.y + ny * step;
@@ -1331,6 +1613,18 @@ export class GameScene extends Phaser.Scene {
   // ── Input handling ───────────────────────────────────────────────────────
 
   private onPointerDown(pointer: Phaser.Input.Pointer) {
+    // M2.1 — build-mode overstyrer all annen pointer-håndtering
+    if (this.buildMode) {
+      if (pointer.rightButtonDown()) {
+        this.cancelBuildMode();
+      } else {
+        const placed = this.placeTower(this.wp(pointer));
+        // Shift = behold build-mode for å plassere flere; ellers exit
+        if (placed && !pointer.event.shiftKey) this.cancelBuildMode();
+      }
+      return;
+    }
+
     if (pointer.rightButtonDown()) {
       this.handleCommandClick(pointer);
       return;
@@ -1344,6 +1638,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer) {
+    if (this.buildMode) {
+      this.updateBuildGhost(this.wp(pointer));
+      this.hoverGfx.clear();
+      return;
+    }
     if (this.pointerIsDown) {
       const w = this.wp(pointer);
       const dx = w.x - this.dragStart.x;
@@ -1767,6 +2066,9 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'toggle-pause': this.togglePause(); break;
       case 'cycle-speed': this.cycleSpeed(+1); break;
+      case 'build-tower-start': this.startBuildMode(c.tower); break;
+      case 'build-cancel': this.cancelBuildMode(); break;
+      case 'formation': this.formationLine(); break;
     }
   }
 
@@ -1780,6 +2082,7 @@ export class GameScene extends Phaser.Scene {
     const minimapBuildings: HudBuilding[] = this.buildings.map((b) => ({
       x: b.x, y: b.y, w: b.w, h: b.h, faction: b.faction, kind: b.kind, hp: b.hp, maxHp: b.maxHp,
       control: b.kind === 'mine' ? (b as MineData).control : undefined,
+      towerType: b.kind === 'tower' && b.tower ? b.tower.type : undefined,
     }));
 
     let selection: HudSelection;
@@ -1834,14 +2137,120 @@ export class GameScene extends Phaser.Scene {
       stats: { trained: this.statsTrained, goldEarned: this.statsGoldEarned },
       gameSpeed: this.gameSpeed,
       alert: this.currentAlert ? { ...this.currentAlert } : null,
+      buildMode: this.buildMode ? ({
+        towerType: this.buildMode.towerType,
+        cost: CONFIG.TOWER_TYPES[this.buildMode.towerType].cost,
+        canAfford: this.playerGold >= CONFIG.TOWER_TYPES[this.buildMode.towerType].cost,
+      } satisfies HudBuildMode) : null,
+      waveMode: CONFIG.WAVE_MODE.enabled ? ({
+        current: Math.max(0, this.currentWaveIndex + 1),
+        total: CONFIG.WAVE_MODE.waves.length,
+        nextInMs: this.waveActive ? 0 : Math.max(0, this.nextWaveAt - this.time.now),
+        active: this.waveActive,
+      } satisfies HudWaveState) : null,
     };
     hudBridge.emitState(s);
   }
 
   // ── AI ───────────────────────────────────────────────────────────────────
 
+  // ── M2.2 — Wave-modus ────────────────────────────────────────────────────
+
+  private updateWaves(time: number, delta: number) {
+    if (!CONFIG.WAVE_MODE.enabled) return;
+    if (this.gameState !== 'running') return;
+
+    // Aktiv bølge: spawn ai-soldater jevnt (én per 700 ms)
+    if (this.waveActive && this.waveSpawnQueue > 0) {
+      this.waveSpawnTimer -= delta;
+      if (this.waveSpawnTimer <= 0) {
+        const spawnX = CONFIG.MAP_WIDTH - 40;
+        const spawnY = Phaser.Math.Between(120, CONFIG.MAP_HEIGHT - 120);
+        const s = this.spawnUnit('ai', 'soldier', spawnX, spawnY);
+        s.attackTarget = this.playerBase;
+        s.state = 'attacking';
+        this.waveSpawnQueue -= 1;
+        this.waveSpawnTimer = 700;
+      }
+    } else if (this.waveActive && this.waveSpawnQueue === 0) {
+      // Bølgen er ferdig spawn-et; den er først "over" når alle ai-units er døde.
+      const aliveAI = this.units.some(u => u.faction === 'ai' && !u.dead);
+      if (!aliveAI) {
+        this.waveActive = false;
+        // Sett opp neste bølge
+        const next = this.currentWaveIndex + 1;
+        if (next >= CONFIG.WAVE_MODE.waves.length) {
+          this.wavesCleared = true;
+        } else {
+          this.nextWaveAt = time + CONFIG.WAVE_MODE.waves[next].delay;
+        }
+      }
+    }
+
+    // Start neste bølge når timer utgår
+    if (!this.waveActive && !this.wavesCleared && time >= this.nextWaveAt) {
+      this.currentWaveIndex += 1;
+      const wave = CONFIG.WAVE_MODE.waves[this.currentWaveIndex];
+      this.waveActive = true;
+      this.waveSpawnQueue = wave.soldiers;
+      this.waveSpawnTimer = 0;
+      this.currentAlert = {
+        message: `BØLGE ${this.currentWaveIndex + 1} — ${wave.soldiers} fiender${wave.boss ? ' + BOSS' : ''}`,
+        urgency: 'critical',
+        triggeredAt: time,
+      };
+      playSfx(this, 'base-alarm', { volume: 0.45 });
+    }
+  }
+
+  /** M2.3 — Arrange valgte soldater i en linje vinkelrett på snitt-bevegelsesretning. */
+  private formationLine() {
+    const soldiers = this.selectedUnits.filter(u => u.type === 'soldier' && !u.dead);
+    if (soldiers.length < 2) return;
+
+    // Snitt-posisjon og snitt-retning (lastDx/lastDy peker dit unitene beveger seg)
+    let cx = 0, cy = 0, dx = 0, dy = 0;
+    for (const s of soldiers) {
+      cx += s.x; cy += s.y;
+      dx += s.lastDx; dy += s.lastDy;
+    }
+    cx /= soldiers.length; cy /= soldiers.length;
+    const dLen = Math.hypot(dx, dy);
+    // Hvis ingen reell retning — bruk retning fra senter mot fiende-base
+    if (dLen < 0.05) {
+      dx = this.aiBase.x - cx; dy = this.aiBase.y - cy;
+      const d2 = Math.hypot(dx, dy) || 1;
+      dx /= d2; dy /= d2;
+    } else {
+      dx /= dLen; dy /= dLen;
+    }
+    // Perpendikulær (90°): (-dy, dx)
+    const px = -dy, py = dx;
+
+    // Sort enheter langs perpendikulær-aksen så de bytter minst plass
+    const projected = soldiers.map(s => ({ s, proj: (s.x - cx) * px + (s.y - cy) * py }));
+    projected.sort((a, b) => a.proj - b.proj);
+
+    const spacing = CONFIG.FORMATION_SPACING;
+    const n = projected.length;
+    const offset0 = -((n - 1) / 2) * spacing;
+    for (let i = 0; i < n; i++) {
+      const t = offset0 + i * spacing;
+      const tx = cx + px * t;
+      const ty = cy + py * t;
+      const u = projected[i].s;
+      u.attackTarget = null;
+      u.mineTarget = null;
+      u.state = 'moving';
+      u.moveTarget = { x: tx, y: ty };
+    }
+    this.spawnCommandRipple(cx, cy, 0xddff88);
+  }
+
   private aiDecision() {
     if (this.gameState !== 'running') return;
+    // M2.2 — wave-modus håndteres separat i updateWaves()
+    if (CONFIG.WAVE_MODE.enabled) return;
 
     const aiAll = this.units.filter(u => u.faction === 'ai' && !u.dead);
     const aiSoldiers = aiAll.filter(u => u.type === 'soldier');

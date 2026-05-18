@@ -60,6 +60,37 @@ export const CONFIG = {
 
   // M1 — audio
   AUDIO_DEFAULT_VOLUME: 0.6,
+
+  // M2.1 — Tower defence (towers)
+  TOWER_BUILD_RADIUS: 350,        // px — towers må plasseres innenfor denne radius fra player-base
+  TOWER_PLACE_CLEARANCE: 40,      // px — minimum avstand til andre bygninger
+  TOWER_TYPES: {
+    stinger: { cost: 80,  hp: 200, damage: 25, range: 200, fireRate: 1000, splash: 0,  slow: 0,    color: 0xb89048 },
+    webber:  { cost: 100, hp: 150, damage: 5,  range: 180, fireRate: 1500, splash: 0,  slow: 0.5,  color: 0xc8c8e8 },
+    spitter: { cost: 120, hp: 180, damage: 15, range: 160, fireRate: 1800, splash: 60, slow: 0,    color: 0x8acc6a },
+  } as const,
+  TOWER_SLOW_DURATION: 1800,       // ms — webber-effekten varer så lenge etter siste treff
+
+  // M2.2 — Wave Defence
+  WAVE_MODE: {
+    enabled: false,
+    // delay = ms etter forrige bølge før denne starter; soldiers = antall som spawnes
+    waves: [
+      { delay: 25000, soldiers: 3,  tank: false, boss: false },
+      { delay: 30000, soldiers: 4,  tank: false, boss: false },
+      { delay: 35000, soldiers: 5,  tank: false, boss: false },
+      { delay: 40000, soldiers: 6,  tank: false, boss: false },
+      { delay: 45000, soldiers: 7,  tank: false, boss: false },
+      { delay: 45000, soldiers: 8,  tank: false, boss: false },
+      { delay: 50000, soldiers: 9,  tank: false, boss: false },
+      { delay: 55000, soldiers: 10, tank: false, boss: false },
+      { delay: 60000, soldiers: 12, tank: false, boss: false },
+      { delay: 70000, soldiers: 15, tank: false, boss: true  },
+    ] as ReadonlyArray<{ delay: number; soldiers: number; tank: boolean; boss: boolean }>,
+  },
+
+  // M2.3 — Choke-formasjon (F-tast)
+  FORMATION_SPACING: 28,           // px — avstand mellom soldater i linjen
 };
 
 // Ant-tema visuell palett — alle rendering-konstanter samlet her

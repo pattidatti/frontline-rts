@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { hudBridge, type HudState, type HudBuilding } from '../game/hudBridge';
+import { hudBridge, type HudState, type HudBuilding, type TowerKind } from '../game/hudBridge';
 import { getVolume, setVolume, onVolumeChange } from '../game/audio';
 import './HudOverlay.css';
 
@@ -72,6 +72,20 @@ function MoundIcon({ size = 22, faction = 'player' }: { size?: number; faction?:
       <ellipse cx="16" cy="20" rx="13" ry="9" fill="none" stroke={rim} strokeWidth="1.2" />
       <ellipse cx="13" cy="16" rx="6" ry="2.4" fill={hl} opacity="0.7" />
       <ellipse cx="16" cy="23" rx="3" ry="2" fill="#0a0604" />
+    </svg>
+  );
+}
+
+function TowerIcon({ size = 22, kind = 'stinger' }: { size?: number; kind?: TowerKind }) {
+  // Stein-tårn med fargesignatur per type.
+  const tip = kind === 'webber' ? '#c8c8e8' : kind === 'spitter' ? '#8acc6a' : '#b89048';
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="28" rx="11" ry="2" fill="#000" opacity="0.45" />
+      <ellipse cx="16" cy="24" rx="10" ry="3" fill="#6a5a3a" stroke="#2a1f12" strokeWidth="1.2" />
+      <rect x="11" y="14" width="10" height="11" fill="#8a7a52" stroke="#3a2a18" strokeWidth="1" />
+      <circle cx="16" cy="11" r="5.5" fill={tip} stroke="#1a1208" strokeWidth="1" />
+      <polygon points="14,6 18,6 16,2" fill={tip} stroke="#1a1208" strokeWidth="1" />
     </svg>
   );
 }
@@ -255,6 +269,8 @@ function Minimap({ s }: { s: HudState }) {
                 : '#e6c45a';
             } else if (b.kind === 'bridge') {
               color = '#8a6638';
+            } else if (b.kind === 'tower') {
+              color = b.towerType === 'webber' ? '#c8c8e8' : b.towerType === 'spitter' ? '#8acc6a' : '#b89048';
             } else {
               color = b.faction === 'player' ? '#6ec8ff'
                 : b.faction === 'ai' ? '#ff7c5a'
@@ -460,18 +476,39 @@ function CommandCard({ s }: { s: HudState }) {
       };
     }
 
-    // Group-select shortcuts (always available, useful). Z/X — unngår WASD-konflikt.
-    arr[4] = {
+    // M2.1 — tower-build-slots (rad 1: bygg-knapper). Spilleren kan bygge tårn uansett valg.
+    const towers: { key: string; type: TowerKind; label: string; cost: number }[] = [
+      { key: '1', type: 'stinger', label: 'Spydd',  cost: 80  },
+      { key: '2', type: 'webber',  label: 'Nett',   cost: 100 },
+      { key: '3', type: 'spitter', label: 'Spytt',  cost: 120 },
+    ];
+    towers.forEach((t, i) => {
+      arr[2 + i] = {
+        key: t.key,
+        label: t.label,
+        icon: <TowerIcon size={40} kind={t.type} />,
+        cost: t.cost,
+        cant: s.player.gold < t.cost,
+        disabled: s.player.gold < t.cost,
+        onClick: () => hudBridge.sendCommand({ type: 'build-tower-start', tower: t.type }),
+      };
+    });
+
+    // M2.3 — formasjon (kun aktivert når minst 2 soldater er valgt)
+    const hasSelectedSoldiers = sel.kind === 'units' && (sel.soldiers ?? 0) >= 2;
+    arr[5] = {
+      key: 'F',
+      label: 'Formasjon',
+      icon: <span style={{ fontSize: 24, color: '#cfe3a3', letterSpacing: 2 }}>▫▫▫</span>,
+      disabled: !hasSelectedSoldiers,
+      onClick: () => hudBridge.sendCommand({ type: 'formation' }),
+    };
+    // Group-select shortcuts — Z/X i nedre rad
+    arr[6] = {
       key: 'Z',
       label: 'Alle sold',
       icon: <AntIcon size={40} kind="soldier" />,
       onClick: () => hudBridge.sendCommand({ type: 'select-all-soldiers' }),
-    };
-    arr[5] = {
-      key: 'X',
-      label: 'Alle arb',
-      icon: <AntIcon size={40} kind="worker" />,
-      onClick: () => hudBridge.sendCommand({ type: 'select-all-workers' }),
     };
     arr[7] = {
       key: 'Esc',
@@ -528,6 +565,54 @@ function AlertBanner({ s }: { s: HudState }) {
   );
 }
 
+// ── Wave banner (M2.2) ────────────────────────────────────────────────
+
+function WaveBanner({ s }: { s: HudState }) {
+  if (!s.waveMode) return null;
+  const { current, total, nextInMs, active } = s.waveMode;
+  const sec = Math.ceil(nextInMs / 1000);
+  const mm = Math.floor(sec / 60);
+  const ss = sec % 60;
+  const countdown = `${mm}:${ss.toString().padStart(2, '0')}`;
+  return (
+    <div className={`rts-wave-banner ${active ? 'active' : 'cooldown'}`}>
+      <span className="rts-wave-label">Bølge</span>
+      <span className="rts-wave-count">{Math.max(1, current)} / {total}</span>
+      {!active && current < total && (
+        <span className="rts-wave-next">Neste om <strong>{countdown}</strong></span>
+      )}
+      {active && <span className="rts-wave-next">Forsvarer base!</span>}
+    </div>
+  );
+}
+
+// ── Build-mode banner (M2.1) ──────────────────────────────────────────
+
+function BuildModeBanner({ s }: { s: HudState }) {
+  if (!s.buildMode) return null;
+  const labels: Record<TowerKind, string> = {
+    stinger: 'Spydd-tårn',
+    webber:  'Nett-tårn',
+    spitter: 'Spytt-tårn',
+  };
+  return (
+    <div className="rts-build-banner">
+      <span className="rts-build-icon"><TowerIcon size={26} kind={s.buildMode.towerType} /></span>
+      <div className="rts-build-info">
+        <div className="rts-build-title">Bygger {labels[s.buildMode.towerType]} — {s.buildMode.cost} mat</div>
+        <div className="rts-build-hint">
+          1/2/3 bytter type · venstreklikk plasserer · Shift = bygg flere · Esc/høyreklikk avbryter
+        </div>
+      </div>
+      <button
+        className="rts-build-cancel"
+        type="button"
+        onClick={() => hudBridge.sendCommand({ type: 'build-cancel' })}
+      >Avbryt</button>
+    </div>
+  );
+}
+
 // ── Root ───────────────────────────────────────────────────────────────
 
 export function HudOverlay() {
@@ -541,7 +626,9 @@ export function HudOverlay() {
   return (
     <div className="rts-hud">
       <TopBar s={state} />
+      <WaveBanner s={state} />
       <AlertBanner s={state} />
+      <BuildModeBanner s={state} />
       <div className="rts-bottom">
         <Minimap s={state} />
         <InfoPanel s={state} />

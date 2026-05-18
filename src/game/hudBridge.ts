@@ -12,10 +12,32 @@ export interface HudUnit {
 export interface HudBuilding {
   x: number; y: number; w: number; h: number;
   faction: Faction;
-  kind: 'base' | 'barracks' | 'mine' | 'bridge';
+  kind: 'base' | 'barracks' | 'mine' | 'bridge' | 'tower';
   hp: number; maxHp: number;
   /** Kun for mines: hvilken faksjon kontrollerer (eller 'contested'). */
   control?: 'player' | 'ai' | 'contested' | null;
+  /** Kun for towers: hvilken tower-type. */
+  towerType?: TowerKind;
+}
+
+/** M2.1 — tower-typer */
+export type TowerKind = 'stinger' | 'webber' | 'spitter';
+
+/** M2.1 — aktiv build-mode (vises som ghost-preview + status i HUD). */
+export interface HudBuildMode {
+  towerType: TowerKind;
+  cost: number;
+  canAfford: boolean;
+}
+
+/** M2.2 — wave-modus status */
+export interface HudWaveState {
+  current: number;       // 1-indeksert
+  total: number;
+  /** ms til neste bølge starter (0 = bølge pågår). */
+  nextInMs: number;
+  /** true når bølge er aktiv (units i spawnet pågår). */
+  active: boolean;
 }
 
 export interface HudSelection {
@@ -67,6 +89,11 @@ export interface HudState {
   gameSpeed: number;
   /** M1.5 — siste varsel; HUD viser banneret i ~3 s etter triggeredAt. */
   alert: HudAlert | null;
+
+  /** M2.1 — aktiv build-mode (null = ikke i build-modus). */
+  buildMode: HudBuildMode | null;
+  /** M2.2 — wave-modus state (null = klassisk modus). */
+  waveMode: HudWaveState | null;
 }
 
 export type HudCommand =
@@ -78,7 +105,10 @@ export type HudCommand =
   | { type: 'minimap-pan'; x: number; y: number }
   | { type: 'minimap-attack'; x: number; y: number }
   | { type: 'toggle-pause' }
-  | { type: 'cycle-speed' };
+  | { type: 'cycle-speed' }
+  | { type: 'build-tower-start'; tower: TowerKind }
+  | { type: 'build-cancel' }
+  | { type: 'formation' };
 
 type StateListener = (s: HudState) => void;
 type CommandListener = (c: HudCommand) => void;
