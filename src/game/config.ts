@@ -43,7 +43,7 @@ export const CONFIG = {
   // AGGRESSION_THRESHOLD hevet til 4 og WORKER_TARGET til 4 så AI også må
   // bygge økonomi før den angriper — gir player en ramp-up-fase.
   AI_DECISION_INTERVAL: 3000,
-  AI_AGGRESSION_THRESHOLD: 4,
+  AI_AGGRESSION_THRESHOLD: 3,
   AI_WORKER_TARGET: 4,
   AI_UNIT_PRIORITY: 'balanced' as UnitPriority,
 
