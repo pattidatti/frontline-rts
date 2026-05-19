@@ -9,7 +9,7 @@ export default function App() {
       width: '100vw',
       height: '100vh',
       overflow: 'hidden',
-      background: 'radial-gradient(ellipse at center, #1a2638 0%, #0a1018 70%, #05080d 100%)',
+      background: 'radial-gradient(ellipse at center, #2a1810 0%, #150a06 70%, #080403 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -24,8 +24,10 @@ export default function App() {
         data-player-soldiers="0"
         data-player-workers="0"
         data-player-base-hp="500"
+        data-player-towers="0"
         data-ai-soldiers="0"
         data-ai-base-hp="500"
+        data-ai-towers="0"
         data-game-time="0"
         style={{ display: 'none' }}
       />

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
+import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
 import { CONFIG } from './config';
 
@@ -22,7 +23,7 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     height: CONFIG.VIEWPORT_HEIGHT,
     parent,
     backgroundColor: '#111820',
-    scene: [BootScene, GameScene],
+    scene: [BootScene, MenuScene, GameScene],
     physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 }, debug: false } },
     scale: {
       mode: Phaser.Scale.FIT,

@@ -10,19 +10,23 @@ interface Step {
 const STEPS: Step[] = [
   {
     title: 'Velkommen, Maur-konge!',
-    body: 'Du styrer den mørke kolonien i vest. Målet er å rive fiendebasen i øst. Bruk WASD eller piltaster for å panorere kameraet, eller klikk på Slagmark-minimapet nede til venstre.',
+    body: 'Du styrer den mørke kolonien i sør. Målet er å rive fiendens maurtue i nord. Panorér kameraet med WASD eller piltaster — eller klikk på Slagmark-minimapet nede til venstre. Trykk H når som helst for å se alle hurtigtaster.',
   },
   {
-    title: 'Skaff mat',
-    body: 'Klikk arbeideren din, og høyreklikk på en Bladlusfarm. Hun henter mat tilbake til basen automatisk. Mat = trening av flere maur.',
+    title: 'Bladlusfarm = mat',
+    body: 'Velg en arbeider og høyreklikk på en Bladlusfarm. Arbeideren stiller seg i farmen og gir deg mat så lenge hun står der — trekk hun ut og minen stopper. Tren flere arbeidere med Q fra maurtua (25 mat hver), så får du mat fra flere farmer samtidig.',
   },
   {
-    title: 'Tren soldater',
-    body: 'Klikk Barakken (eller trykk E) for å trene soldater for 50 mat. Du kan kjøpe nye arbeidere med Q. Selecter alle soldater med Z, alle arbeidere med X.',
+    title: 'Bygg barakke & tren soldater',
+    body: 'Først må du bygge en barakke: trykk 4 (eller klikk Barakke-knappen) → venstreklikk et sted nær basen → en arbeider bygger den. Etterpå: trykk E ved barakka for å trene en soldat (50 mat). Bruk Z for å velge alle soldater, X for alle arbeidere.',
   },
   {
-    title: 'Kryss broa',
-    body: 'Elven splitter kartet. Send soldater øst — de finner broa automatisk. Pass på! Fienden kan rive broa for å isolere deg. Beskytt egne broer og angrip fiendens.',
+    title: 'Tårn, murer & forsvar',
+    body: 'Når økonomien går: bygg tårn (1=Spydd, 2=Nett, 3=Spytt) nær basen. Bruk farm (5), mur (6) og smie (7) til å snowballe. Velg maurtua og trykk V (eller klikk Forsvar) for å gjøre selve tua til et tårn. Alt bygges av en arbeider — hold minst 2–3 i mining til enhver tid.',
+  },
+  {
+    title: 'Kryss elva & ta platåene',
+    body: 'Elven splitter kartet — maur kan ikke svømme, så broene er kritiske passasjer. Send soldater nord; de finner broa automatisk. Det høye landet har ramper du må bruke for å komme opp. Hold de kontesta minene midt på kartet for å sulte fienden ut!',
   },
 ];
 

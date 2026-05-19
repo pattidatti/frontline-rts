@@ -1,0 +1,76 @@
+- generic [ref=e3]:
+  - generic:
+    - generic [ref=e22]:
+      - generic [ref=e23]: Frontline RTS
+      - button "▶ 1×" [ref=e24] [cursor=pointer]
+      - generic:
+        - img [ref=e26]
+        - generic [ref=e32]:
+          - generic [ref=e33]: "20"
+          - generic [ref=e34]: Mat
+      - generic:
+        - img [ref=e36]
+        - generic [ref=e54]:
+          - generic [ref=e55]: "13"
+          - generic [ref=e56]: Soldater
+      - generic:
+        - img [ref=e58]
+        - generic [ref=e73]:
+          - generic [ref=e74]: "3"
+          - generic [ref=e75]: Arbeidere
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - img [ref=e79]
+          - generic [ref=e85]:
+            - generic [ref=e86]: "500"
+            - generic [ref=e87]: Fiende-tue
+        - generic [ref=e88]:
+          - img [ref=e90]
+          - generic [ref=e108]:
+            - generic [ref=e109]: "4"
+            - generic [ref=e110]: Fiendesold
+      - generic "Volum 60 %" [ref=e111]:
+        - button "Mute" [ref=e112] [cursor=pointer]: 🔉
+        - slider "Volum" [ref=e113] [cursor=pointer]: "0.6"
+      - generic [ref=e114]: ⏱ 1:09
+    - generic [ref=e115]:
+      - generic [ref=e116]:
+        - generic [ref=e117]: Slagmark
+        - img [ref=e119]
+      - generic [ref=e135]:
+        - generic [ref=e136]: Utvalg
+        - generic [ref=e137]: Ingen valgt — venstreklikk en enhet, dra for boks-velg, eller klikk larvekammeret for å trene.
+      - generic [ref=e138]:
+        - generic [ref=e139]: Kommandoer
+        - generic [ref=e140]:
+          - button "Q Arbeider 30" [disabled] [ref=e141]:
+            - generic [ref=e142]: Q
+            - img [ref=e144]
+            - generic [ref=e159]: Arbeider
+            - generic [ref=e160]: "30"
+          - button "E Soldat 50" [disabled] [ref=e161]:
+            - generic [ref=e162]: E
+            - img [ref=e164]
+            - generic [ref=e182]: Soldat
+            - generic [ref=e183]: "50"
+          - button "Z Alle sold" [ref=e186] [cursor=pointer]:
+            - generic [ref=e187]: Z
+            - img [ref=e189]
+            - generic [ref=e207]: Alle sold
+          - button "X Alle arb" [ref=e208] [cursor=pointer]:
+            - generic [ref=e209]: X
+            - img [ref=e211]
+            - generic [ref=e226]: Alle arb
+          - button "Esc ✕ Rydd" [ref=e228] [cursor=pointer]:
+            - generic [ref=e229]: Esc
+            - generic [ref=e231]: ✕
+            - generic [ref=e232]: Rydd
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]: Trinn 1 / 4
+      - button "Hopp over tutorial" [ref=e11] [cursor=pointer]: Hopp over
+    - generic [ref=e12]: Velkommen, Maur-konge!
+    - generic [ref=e13]: Du styrer den mørke kolonien i vest. Målet er å rive fiendebasen i øst. Bruk WASD eller piltaster for å panorere kameraet, eller klikk på Slagmark-minimapet nede til venstre.
+    - generic [ref=e14]:
+      - button "Forrige" [disabled] [ref=e15] [cursor=pointer]
+      - button "Neste" [ref=e21] [cursor=pointer]

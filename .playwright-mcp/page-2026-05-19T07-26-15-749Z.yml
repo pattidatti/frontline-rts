@@ -1,0 +1,85 @@
+- generic [ref=e3]:
+  - generic:
+    - generic [ref=e6]:
+      - generic [ref=e7]: Frontline RTS
+      - button "⏸" [ref=e277] [cursor=pointer]
+      - generic [ref=e9]:
+        - img [ref=e11]
+        - generic [ref=e17]:
+          - generic [ref=e18]: "40"
+          - generic [ref=e19]: Mat
+      - generic [ref=e21]:
+        - img [ref=e23]
+        - generic [ref=e41]:
+          - generic [ref=e42]: "0"
+          - generic [ref=e43]: Soldater
+      - generic [ref=e44]:
+        - img [ref=e46]
+        - generic [ref=e61]:
+          - generic [ref=e62]: "3"
+          - generic [ref=e63]: Arbeidere
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - img [ref=e67]
+          - generic [ref=e73]:
+            - generic [ref=e74]: "500"
+            - generic [ref=e75]: Fiende-tue
+        - generic [ref=e76]:
+          - img [ref=e78]
+          - generic [ref=e96]:
+            - generic [ref=e97]: "13"
+            - generic [ref=e98]: Fiendesold
+      - generic "Volum 60 %" [ref=e100]:
+        - button "Mute" [ref=e101] [cursor=pointer]: 🔉
+        - slider "Volum" [ref=e102] [cursor=pointer]: "0.6"
+      - generic [ref=e104]: ⏱ 0:20
+    - generic [ref=e283]:
+      - img [ref=e295]
+      - generic [ref=e291]:
+        - generic [ref=e292]: Bygger Mur — 20 mat
+        - generic [ref=e293]: 1/2/3 = tårn · 4/5/6 = farm/mur/våpenkammer · venstreklikk plasserer · Shift = bygg flere · Esc avbryter
+      - button "Avbryt" [ref=e294] [cursor=pointer]
+    - generic [ref=e117]:
+      - generic [ref=e118]:
+        - generic [ref=e119]: Slagmark
+        - img [ref=e121]
+      - generic [ref=e141]:
+        - generic [ref=e142]: Utvalg
+        - generic [ref=e143]: Ingen valgt — venstreklikk en enhet, dra for boks-velg, eller klikk larvekammeret for å trene.
+      - generic [ref=e144]:
+        - generic [ref=e145]: Kommandoer
+        - generic [ref=e146]:
+          - button "1 Spydd 80" [disabled] [ref=e151]:
+            - generic [ref=e152]: "1"
+            - img [ref=e154]
+            - generic [ref=e160]: Spydd
+            - generic [ref=e161]: "80"
+          - button "2 Nett 100" [disabled] [ref=e162]:
+            - generic [ref=e163]: "2"
+            - img [ref=e165]
+            - generic [ref=e171]: Nett
+            - generic [ref=e172]: "100"
+          - button "3 Spytt 120" [disabled] [ref=e173]:
+            - generic [ref=e174]: "3"
+            - img [ref=e176]
+            - generic [ref=e182]: Spytt
+            - generic [ref=e183]: "120"
+          - button "4 Avlsfarm 60" [disabled] [ref=e185]:
+            - generic [ref=e186]: "4"
+            - img [ref=e188]
+            - generic [ref=e194]: Avlsfarm
+            - generic [ref=e195]: "60"
+          - button "5 Mur 20" [ref=e196] [cursor=pointer]:
+            - generic [ref=e197]: "5"
+            - img [ref=e199]
+            - generic [ref=e203]: Mur
+            - generic [ref=e204]: "20"
+          - button "6 Smie 100" [disabled] [ref=e205]:
+            - generic [ref=e206]: "6"
+            - img [ref=e208]
+            - generic [ref=e215]: Smie
+            - generic [ref=e216]: "100"
+          - button "Esc ✕ Rydd" [ref=e217] [cursor=pointer]:
+            - generic [ref=e218]: Esc
+            - generic [ref=e220]: ✕
+            - generic [ref=e221]: Rydd

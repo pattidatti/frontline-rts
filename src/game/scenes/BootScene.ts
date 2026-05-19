@@ -22,6 +22,6 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('spark', size + 4, size + 4);
     g.destroy();
 
-    this.scene.start('GameScene');
+    this.scene.start('MenuScene');
   }
 }

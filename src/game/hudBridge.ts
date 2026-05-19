@@ -12,20 +12,32 @@ export interface HudUnit {
 export interface HudBuilding {
   x: number; y: number; w: number; h: number;
   faction: Faction;
-  kind: 'base' | 'barracks' | 'mine' | 'bridge' | 'tower';
+  kind: 'base' | 'barracks' | 'mine' | 'bridge' | 'tower' | 'farm' | 'wall' | 'armory';
   hp: number; maxHp: number;
   /** Kun for mines: hvilken faksjon kontrollerer (eller 'contested'). */
   control?: 'player' | 'ai' | 'contested' | null;
   /** Kun for towers: hvilken tower-type. */
   towerType?: TowerKind;
+  /** M3.2 — settes på player-base når Forsvar er kjøpt. */
+  hasDefense?: boolean;
+  /** True hvis bygningen er under konstruksjon (worker bygger den fortsatt). */
+  underConstruction?: boolean;
+  /** Konstruksjonsprogress 0..1; udefinert for ferdige bygninger. */
+  buildProgress?: number;
 }
 
 /** M2.1 — tower-typer */
 export type TowerKind = 'stinger' | 'webber' | 'spitter';
 
-/** M2.1 — aktiv build-mode (vises som ghost-preview + status i HUD). */
+/** M3.1 — bygg-typer (ikke-tower). */
+export type BuildingKind = 'farm' | 'wall' | 'armory' | 'barracks';
+
+/** M3.1 — alt som kan bygges via build-mode. */
+export type BuildKind = TowerKind | BuildingKind;
+
+/** M2.1 / M3.1 — aktiv build-mode (vises som ghost-preview + status i HUD). */
 export interface HudBuildMode {
-  towerType: TowerKind;
+  kind: BuildKind;
   cost: number;
   canAfford: boolean;
 }
@@ -49,6 +61,13 @@ export interface HudSelection {
   singleType?: 'worker' | 'soldier';
   singleHp?: number;
   singleMaxHp?: number;
+  /** V5 — kun for single unit: hva enheten gjør akkurat nå (vises som progress / status-tekst). */
+  currentAction?: {
+    type: 'idle' | 'moving' | 'mining' | 'building' | 'attacking';
+    label: string;
+    /** 0..1 hvis aktiviteten har konkret framgang (building). */
+    progress?: number;
+  };
   // For 'building':
   building?: HudBuilding;
 }
@@ -83,7 +102,18 @@ export interface HudState {
   map: { width: number; height: number };
   camera: { x: number; y: number; width: number; height: number };
   minimap: { units: HudUnit[]; buildings: HudBuilding[] };
-  stats: { trained: number; goldEarned: number };
+  stats: {
+    trained: number;
+    goldEarned: number;
+    /** V7 — utvidet stats for game-over panel. */
+    soldiersTrained: number;
+    workersTrained: number;
+    enemyKills: number;
+    unitsLost: number;
+    peakMines: number;
+    aiTowers: number;
+    playerTowers: number;
+  };
 
   /** M1.1 — 0 = paused, ellers fra CONFIG.TIME_SCALES. */
   gameSpeed: number;
@@ -107,8 +137,12 @@ export type HudCommand =
   | { type: 'toggle-pause' }
   | { type: 'cycle-speed' }
   | { type: 'build-tower-start'; tower: TowerKind }
+  | { type: 'build-start'; kind: BuildKind }
   | { type: 'build-cancel' }
-  | { type: 'formation' };
+  | { type: 'formation' }
+  | { type: 'upgrade-base-defense' }
+  /** V7 — tilbake til MenuScene fra game-over. */
+  | { type: 'to-menu' };
 
 type StateListener = (s: HudState) => void;
 type CommandListener = (c: HudCommand) => void;

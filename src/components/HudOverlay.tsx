@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { hudBridge, type HudState, type HudBuilding, type TowerKind } from '../game/hudBridge';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { hudBridge, type HudState, type HudBuilding, type TowerKind, type BuildKind } from '../game/hudBridge';
 import { getVolume, setVolume, onVolumeChange } from '../game/audio';
 import './HudOverlay.css';
 
@@ -90,6 +90,58 @@ function TowerIcon({ size = 22, kind = 'stinger' }: { size?: number; kind?: Towe
   );
 }
 
+function FarmIcon({ size = 22 }: { size?: number }) {
+  // Bladlus-farm: blad med 3 bladlus
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="26" rx="13" ry="2" fill="#000" opacity="0.35" />
+      <ellipse cx="16" cy="18" rx="13" ry="9" fill="#4f8a3a" stroke="#2a4a1c" strokeWidth="1" />
+      <path d="M 4 18 L 28 18" stroke="#2a4a1c" strokeWidth="1.2" />
+      <ellipse cx="10" cy="14" rx="3" ry="2.2" fill="#88dd66" stroke="#356b22" strokeWidth="0.7" />
+      <ellipse cx="16" cy="13" rx="3" ry="2.2" fill="#88dd66" stroke="#356b22" strokeWidth="0.7" />
+      <ellipse cx="22" cy="14" rx="3" ry="2.2" fill="#88dd66" stroke="#356b22" strokeWidth="0.7" />
+    </svg>
+  );
+}
+
+function WallIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="28" rx="13" ry="2" fill="#000" opacity="0.35" />
+      <rect x="5" y="8" width="22" height="18" fill="#6c5a3a" stroke="#2a1f12" strokeWidth="1.4" />
+      <rect x="5" y="8" width="22" height="3.5" fill="#8a7a52" />
+      <line x1="11" y1="11.5" x2="11" y2="26" stroke="#2a1f12" strokeWidth="0.9" />
+      <line x1="21" y1="11.5" x2="21" y2="26" stroke="#2a1f12" strokeWidth="0.9" />
+      <line x1="5" y1="18" x2="27" y2="18" stroke="#2a1f12" strokeWidth="0.7" />
+    </svg>
+  );
+}
+
+function ArmoryIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="29" rx="12" ry="2" fill="#000" opacity="0.4" />
+      <rect x="6" y="12" width="20" height="15" fill="#8a6a3a" stroke="#3a2a18" strokeWidth="1.2" />
+      <polygon points="4,12 28,12 16,4" fill="#6c4a26" stroke="#2a1f12" strokeWidth="1.2" />
+      <rect x="13" y="17" width="6" height="10" fill="#2a1f12" />
+      <rect x="11" y="20" width="10" height="1.8" fill="#9aa0a8" />
+      <rect x="14.5" y="20" width="3" height="3" fill="#5a606a" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <path d="M 16 4 L 26 8 L 26 18 Q 26 24 16 28 Q 6 24 6 18 L 6 8 Z"
+        fill="#b8945a" stroke="#3a2a14" strokeWidth="1.4" />
+      <path d="M 16 4 L 26 8 L 26 18 Q 26 24 16 28 Z" fill="#8e6638" opacity="0.5" />
+      <line x1="16" y1="11" x2="16" y2="22" stroke="#f5e8c8" strokeWidth="1.4" strokeLinecap="round" />
+      <line x1="11" y1="16" x2="21" y2="16" stroke="#f5e8c8" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function BarracksIcon({ size = 22, faction = 'player' }: { size?: number; faction?: 'player' | 'ai' }) {
   const main = faction === 'player' ? '#6b4a2a' : '#7a3a1a';
   const rim = faction === 'player' ? '#3a2614' : '#401a0a';
@@ -166,6 +218,46 @@ function SpeedBadge({ s }: { s: HudState }) {
   );
 }
 
+function ResValue({ value, className = '' }: { value: number; className?: string }) {
+  const [displayed, setDisplayed] = useState(value);
+  const [flashing, setFlashing] = useState(false);
+  const prevTargetRef = useRef(value);
+  const rafRef = useRef<number | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = prevTargetRef.current;
+    const to = value;
+    prevTargetRef.current = to;
+    if (from === to) return;
+    if (to > from) {
+      setFlashing(true);
+      if (flashTimerRef.current != null) window.clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = window.setTimeout(() => setFlashing(false), 260);
+    }
+    const start = performance.now();
+    const dur = Math.min(280, Math.max(120, Math.abs(to - from) * 18));
+    const tween = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - (1 - t) * (1 - t);
+      setDisplayed(Math.round(from + (to - from) * eased));
+      if (t < 1) rafRef.current = requestAnimationFrame(tween);
+      else rafRef.current = null;
+    };
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(tween);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [value]);
+
+  useEffect(() => () => {
+    if (flashTimerRef.current != null) window.clearTimeout(flashTimerRef.current);
+  }, []);
+
+  return <span className={`rts-res-value ${flashing ? 'flash' : ''} ${className}`}>{displayed}</span>;
+}
+
 function TopBar({ s }: { s: HudState }) {
   return (
     <div className="rts-topbar">
@@ -175,7 +267,7 @@ function TopBar({ s }: { s: HudState }) {
       <div className="rts-res">
         <span className="rts-res-icon"><FoodIcon /></span>
         <div className="rts-res-stack">
-          <span className="rts-res-value">{s.player.gold}</span>
+          <ResValue value={s.player.gold} />
           <span className="rts-res-label">Mat</span>
         </div>
       </div>
@@ -185,7 +277,7 @@ function TopBar({ s }: { s: HudState }) {
       <div className="rts-res">
         <span className="rts-res-icon"><AntIcon kind="soldier" /></span>
         <div className="rts-res-stack">
-          <span className="rts-res-value">{s.player.soldiers}</span>
+          <ResValue value={s.player.soldiers} />
           <span className="rts-res-label">Soldater</span>
         </div>
       </div>
@@ -193,7 +285,7 @@ function TopBar({ s }: { s: HudState }) {
       <div className="rts-res">
         <span className="rts-res-icon"><AntIcon kind="worker" /></span>
         <div className="rts-res-stack">
-          <span className="rts-res-value">{s.player.workers}</span>
+          <ResValue value={s.player.workers} />
           <span className="rts-res-label">Arbeidere</span>
         </div>
       </div>
@@ -204,14 +296,14 @@ function TopBar({ s }: { s: HudState }) {
         <div className="rts-res">
           <span className="rts-res-icon"><MoundIcon faction="ai" /></span>
           <div className="rts-res-stack">
-            <span className="rts-res-value">{Math.max(0, s.enemy.baseHp)}</span>
+            <ResValue value={Math.max(0, s.enemy.baseHp)} />
             <span className="rts-res-label">Fiende-tue</span>
           </div>
         </div>
         <div className="rts-res">
           <span className="rts-res-icon"><AntIcon kind="soldier" faction="ai" /></span>
           <div className="rts-res-stack">
-            <span className="rts-res-value">{s.enemy.soldiers}</span>
+            <ResValue value={s.enemy.soldiers} />
             <span className="rts-res-label">Fiendesold</span>
           </div>
         </div>
@@ -244,7 +336,7 @@ function Minimap({ s }: { s: HudState }) {
   };
 
   return (
-    <div className="rts-section rts-minimap-section">
+    <div className="rts-panel rts-minimap-panel">
       <div className="rts-section-title">Slagmark</div>
       <div className="rts-minimap-frame" onMouseDown={handleClick} onContextMenu={(e) => e.preventDefault()}>
         <svg viewBox={`0 0 ${mw} ${mh}`} preserveAspectRatio="none">
@@ -259,18 +351,29 @@ function Minimap({ s }: { s: HudState }) {
           </g>
           {/* buildings */}
           {buildings.map((b, i) => {
-            // Mines fargelegges etter kontroll (T1-D). Broer er nøytrale, brun trefarge.
-            // Andre buildings etter faksjon.
+            // V9 — Mines fargelegges etter kontroll. Contested = oransje stripet (differensiert
+            // fra AI sin røde) så spilleren ikke forveksler "i kamp" med "fiende-eid".
             let color: string;
+            let stroke: string = '#000';
+            let strokeW = Math.max(1, mw / 400);
             if (b.kind === 'mine') {
-              color = b.control === 'player' ? '#6ec8ff'
-                : b.control === 'ai' ? '#ff7c5a'
-                : b.control === 'contested' ? '#ff3333'
-                : '#e6c45a';
+              if (b.control === 'contested') {
+                color = '#ffaa33';            // markant oransje
+                stroke = '#ff6600';
+                strokeW = Math.max(2, mw / 240);
+              } else {
+                color = b.control === 'player' ? '#6ec8ff'
+                  : b.control === 'ai' ? '#ff7c5a'
+                  : '#e6c45a';
+              }
             } else if (b.kind === 'bridge') {
               color = '#8a6638';
             } else if (b.kind === 'tower') {
-              color = b.towerType === 'webber' ? '#c8c8e8' : b.towerType === 'spitter' ? '#8acc6a' : '#b89048';
+              const tColor = b.towerType === 'webber' ? '#c8c8e8' : b.towerType === 'spitter' ? '#8acc6a' : '#b89048';
+              color = tColor;
+              // Distinguish tower faction via stroke
+              stroke = b.faction === 'ai' ? '#ff5a30' : '#3a8ec8';
+              strokeW = Math.max(1.5, mw / 320);
             } else {
               color = b.faction === 'player' ? '#6ec8ff'
                 : b.faction === 'ai' ? '#ff7c5a'
@@ -283,7 +386,7 @@ function Minimap({ s }: { s: HudState }) {
                 x={b.x - w / 2} y={b.y - h / 2}
                 width={w} height={h}
                 fill={color}
-                stroke="#000" strokeWidth={Math.max(1, mw / 400)}
+                stroke={stroke} strokeWidth={strokeW}
                 opacity={b.hp > 0 ? 0.95 : 0.3}
               />
             );
@@ -324,27 +427,51 @@ function hpClass(hp: number, max: number) {
 function BuildingPortrait({ b }: { b: HudBuilding }) {
   if (b.kind === 'barracks') return <BarracksIcon size={72} faction={b.faction === 'ai' ? 'ai' : 'player'} />;
   if (b.kind === 'base') return <MoundIcon size={72} faction={b.faction === 'ai' ? 'ai' : 'player'} />;
+  if (b.kind === 'tower') return <TowerIcon size={72} kind={b.towerType ?? 'stinger'} />;
+  if (b.kind === 'farm') return <FarmIcon size={72} />;
+  if (b.kind === 'wall') return <WallIcon size={72} />;
+  if (b.kind === 'armory') return <ArmoryIcon size={72} />;
   return <FoodIcon size={72} />;
 }
 
 function buildingName(b: HudBuilding): string {
-  if (b.kind === 'base') return b.faction === 'player' ? 'Maurtue (Hjem)' : 'Fiende-tue';
-  if (b.kind === 'barracks') return b.faction === 'player' ? 'Larvekammer' : 'Fiende-larvekammer';
+  if (b.kind === 'base') return b.faction === 'player' ? 'Maurtue (Hjem)' : 'Fiende-maurtue';
+  if (b.kind === 'barracks') return b.faction === 'player' ? 'Barakke' : 'Fiende-barakke';
+  if (b.kind === 'tower') {
+    const tn: Record<TowerKind, string> = { stinger: 'Spydd-tårn', webber: 'Nett-tårn', spitter: 'Spytt-tårn' };
+    return tn[b.towerType ?? 'stinger'];
+  }
+  if (b.kind === 'farm') return 'Avlsfarm';
+  if (b.kind === 'wall') return 'Mur';
+  if (b.kind === 'armory') return 'Våpenkammer';
   return 'Matkilde';
+}
+
+const BUILD_KIND_LABELS: Record<BuildKind, string> = {
+  stinger: 'Spydd-tårn',
+  webber: 'Nett-tårn',
+  spitter: 'Spytt-tårn',
+  farm: 'Avlsfarm',
+  wall: 'Mur',
+  armory: 'Våpenkammer',
+  barracks: 'Barakke',
+};
+
+function BuildKindIcon({ size = 22, kind }: { size?: number; kind: BuildKind }) {
+  if (kind === 'farm') return <FarmIcon size={size} />;
+  if (kind === 'wall') return <WallIcon size={size} />;
+  if (kind === 'armory') return <ArmoryIcon size={size} />;
+  if (kind === 'barracks') return <BarracksIcon size={size} faction="player" />;
+  return <TowerIcon size={size} kind={kind} />;
 }
 
 function InfoPanel({ s }: { s: HudState }) {
   const sel = s.selection;
+  if (sel.kind === 'none') return null;
 
   return (
-    <div className="rts-section rts-info-section">
+    <div className="rts-panel rts-info-panel" key={`${sel.kind}-${sel.kind === 'building' ? sel.building?.kind : sel.singleType ?? 'group'}`}>
       <div className="rts-section-title">Utvalg</div>
-
-      {sel.kind === 'none' && (
-        <div className="rts-info-empty">
-          Ingen valgt — venstreklikk en enhet, dra for boks-velg, eller klikk larvekammeret for å trene.
-        </div>
-      )}
 
       {sel.kind === 'building' && sel.building && (
         <div className="rts-info-row">
@@ -352,14 +479,24 @@ function InfoPanel({ s }: { s: HudState }) {
           <div className="rts-info-meta">
             <div className="rts-info-name">{buildingName(sel.building)}</div>
             <div className="rts-info-sub">
-              {sel.building.kind === 'barracks' ? 'Treningsstruktur' : sel.building.kind === 'base' ? 'Hovedstruktur' : ''}
+              {sel.building.underConstruction
+                ? 'Under konstruksjon'
+                : sel.building.kind === 'barracks' ? 'Soldat-trener'
+                : sel.building.kind === 'base' ? 'Arbeider-trener'
+                : ''}
             </div>
             <div className="rts-hp-bar">
               <div className={`rts-hp-fill ${hpClass(sel.building.hp, sel.building.maxHp)}`}
                 style={{ width: `${Math.max(0, (sel.building.hp / sel.building.maxHp) * 100)}%` }} />
               <div className="rts-hp-label">{Math.max(0, sel.building.hp)} / {sel.building.maxHp} HP</div>
             </div>
-            {sel.building.kind === 'barracks' && sel.building.faction === 'player' && (
+            {sel.building.underConstruction && sel.building.buildProgress != null && (
+              <div className="rts-hp-bar" style={{ marginTop: 4 }}>
+                <div className="rts-hp-fill" style={{ width: `${Math.round(sel.building.buildProgress * 100)}%`, background: '#ddcc88' }} />
+                <div className="rts-hp-label">Bygger: {Math.round(sel.building.buildProgress * 100)} %</div>
+              </div>
+            )}
+            {sel.building.kind === 'barracks' && sel.building.faction === 'player' && !sel.building.underConstruction && (
               <div className="rts-info-sub" style={{ opacity: 0.85 }}>
                 Høyreklikk i verdenen → setter rally-punkt for nye soldater
               </div>
@@ -388,6 +525,22 @@ function InfoPanel({ s }: { s: HudState }) {
                 <div className={`rts-hp-fill ${hpClass(sel.singleHp, sel.singleMaxHp)}`}
                   style={{ width: `${Math.max(0, (sel.singleHp / sel.singleMaxHp) * 100)}%` }} />
                 <div className="rts-hp-label">{sel.singleHp} / {sel.singleMaxHp} HP</div>
+              </div>
+            )}
+
+            {/* V5 — orders in progress (single unit) */}
+            {sel.singleType && sel.currentAction && (
+              <div className="rts-action-status">
+                <span className={`rts-action-dot rts-action-${sel.currentAction.type}`} />
+                <span className="rts-action-label">{sel.currentAction.label}</span>
+                {sel.currentAction.progress != null && (
+                  <div className="rts-action-progress">
+                    <div
+                      className="rts-action-progress-fill"
+                      style={{ width: `${Math.round(sel.currentAction.progress * 100)}%` }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -428,9 +581,10 @@ type CommandSlot = {
 
 function CmdButton({ slot }: { slot: CommandSlot | null }) {
   if (!slot) return <div className="rts-cmd rts-cmd-empty" aria-hidden />;
+  const affordable = slot.cost != null && !slot.disabled && !slot.cant;
   return (
     <button
-      className="rts-cmd"
+      className={`rts-cmd ${affordable ? 'affordable' : ''}`}
       disabled={slot.disabled}
       onClick={slot.onClick}
       title={`${slot.label}${slot.cost ? ` · ${slot.cost} mat` : ''} [${slot.key}]`}
@@ -448,80 +602,158 @@ function CmdButton({ slot }: { slot: CommandSlot | null }) {
 function CommandCard({ s }: { s: HudState }) {
   const sel = s.selection;
   const slots: (CommandSlot | null)[] = useMemo(() => {
-    const arr: (CommandSlot | null)[] = new Array(8).fill(null);
+    const arr: (CommandSlot | null)[] = new Array(12).fill(null);
 
-    const showTrain =
-      sel.kind === 'building' && sel.building?.kind === 'barracks' && sel.building.faction === 'player';
+    // Helpers — bygger slots kun når relevant for det aktive utvalget.
+    // Blizzard-mønster: kortet bytter ut rad 1 etter selection, rad 2-3 er alltid bygg-knapper.
+    const wCost = s.costs.worker;
+    const sCost = s.costs.soldier;
+    const defenseCost = 100; // matcher CONFIG.BASE_DEFENSE_COST
 
-    if (showTrain || sel.kind === 'none' || sel.kind === 'units') {
-      const wCost = s.costs.worker;
-      const sCost = s.costs.soldier;
-      arr[0] = {
+    const trainWorkerSlot = (idx: number) => {
+      arr[idx] = {
         key: 'Q',
         label: 'Arbeider',
-        icon: <AntIcon size={44} kind="worker" />,
+        icon: <AntIcon size={40} kind="worker" />,
         cost: wCost,
         cant: s.player.gold < wCost,
-        disabled: !showTrain || s.player.gold < wCost,
+        disabled: s.player.gold < wCost,
         onClick: () => hudBridge.sendCommand({ type: 'train', unit: 'worker' }),
       };
-      arr[1] = {
+    };
+    const trainSoldierSlot = (idx: number) => {
+      arr[idx] = {
         key: 'E',
         label: 'Soldat',
-        icon: <AntIcon size={44} kind="soldier" />,
+        icon: <AntIcon size={40} kind="soldier" />,
         cost: sCost,
         cant: s.player.gold < sCost,
-        disabled: !showTrain || s.player.gold < sCost,
+        disabled: s.player.gold < sCost,
         onClick: () => hudBridge.sendCommand({ type: 'train', unit: 'soldier' }),
       };
-    }
+    };
 
-    // M2.1 — tower-build-slots (rad 1: bygg-knapper). Spilleren kan bygge tårn uansett valg.
-    const towers: { key: string; type: TowerKind; label: string; cost: number }[] = [
-      { key: '1', type: 'stinger', label: 'Spydd',  cost: 80  },
-      { key: '2', type: 'webber',  label: 'Nett',   cost: 100 },
-      { key: '3', type: 'spitter', label: 'Spytt',  cost: 120 },
-    ];
-    towers.forEach((t, i) => {
-      arr[2 + i] = {
-        key: t.key,
-        label: t.label,
-        icon: <TowerIcon size={40} kind={t.type} />,
-        cost: t.cost,
-        cant: s.player.gold < t.cost,
-        disabled: s.player.gold < t.cost,
-        onClick: () => hudBridge.sendCommand({ type: 'build-tower-start', tower: t.type }),
+    const defenseSlot = (already: boolean, idx = 1) => {
+      arr[idx] = {
+        key: 'V',
+        label: already ? 'Forsvar ✓' : 'Forsvar',
+        icon: <ShieldIcon size={40} />,
+        cost: already ? undefined : defenseCost,
+        cant: !already && s.player.gold < defenseCost,
+        disabled: already || s.player.gold < defenseCost,
+        onClick: () => hudBridge.sendCommand({ type: 'upgrade-base-defense' }),
       };
-    });
+    };
 
-    // M2.3 — formasjon (kun aktivert når minst 2 soldater er valgt)
-    const hasSelectedSoldiers = sel.kind === 'units' && (sel.soldiers ?? 0) >= 2;
-    arr[5] = {
-      key: 'F',
-      label: 'Formasjon',
-      icon: <span style={{ fontSize: 24, color: '#cfe3a3', letterSpacing: 2 }}>▫▫▫</span>,
-      disabled: !hasSelectedSoldiers,
-      onClick: () => hudBridge.sendCommand({ type: 'formation' }),
+    const towerSlots = () => {
+      const towers: { key: string; type: TowerKind; label: string; cost: number }[] = [
+        { key: '1', type: 'stinger', label: 'Spydd',  cost: 80  },
+        { key: '2', type: 'webber',  label: 'Nett',   cost: 100 },
+        { key: '3', type: 'spitter', label: 'Spytt',  cost: 120 },
+      ];
+      towers.forEach((t, i) => {
+        arr[4 + i] = {
+          key: t.key,
+          label: t.label,
+          icon: <TowerIcon size={36} kind={t.type} />,
+          cost: t.cost,
+          cant: s.player.gold < t.cost,
+          disabled: s.player.gold < t.cost,
+          onClick: () => hudBridge.sendCommand({ type: 'build-start', kind: t.type }),
+        };
+      });
     };
-    // Group-select shortcuts — Z/X i nedre rad
-    arr[6] = {
-      key: 'Z',
-      label: 'Alle sold',
-      icon: <AntIcon size={40} kind="soldier" />,
-      onClick: () => hudBridge.sendCommand({ type: 'select-all-soldiers' }),
+
+    const buildingSlots = () => {
+      const buildings: { key: string; kind: BuildKind; label: string; cost: number; icon: React.ReactNode }[] = [
+        { key: '4', kind: 'barracks', label: 'Barakke', cost: 80, icon: <BarracksIcon size={36} faction="player" /> },
+        { key: '5', kind: 'farm',     label: 'Avlsfarm', cost: 60,  icon: <FarmIcon size={36} /> },
+        { key: '6', kind: 'wall',     label: 'Mur',     cost: 20,  icon: <WallIcon size={36} /> },
+        { key: '7', kind: 'armory',   label: 'Vpn.kammer', cost: 100, icon: <ArmoryIcon size={36} /> },
+      ];
+      buildings.forEach((b, i) => {
+        arr[7 + i] = {
+          key: b.key,
+          label: b.label,
+          icon: b.icon,
+          cost: b.cost,
+          cant: s.player.gold < b.cost,
+          disabled: s.player.gold < b.cost,
+          onClick: () => hudBridge.sendCommand({ type: 'build-start', kind: b.kind }),
+        };
+      });
     };
-    arr[7] = {
-      key: 'Esc',
-      label: 'Rydd',
-      icon: <span style={{ fontSize: 36, color: '#a89878', lineHeight: 1 }}>✕</span>,
-      onClick: () => hudBridge.sendCommand({ type: 'clear-selection' }),
+
+    const formationSlot = (idx: number) => {
+      arr[idx] = {
+        key: 'F',
+        label: 'Formasjon',
+        icon: <span style={{ fontSize: 20, color: '#cfe3a3', letterSpacing: 2 }}>▫▫▫</span>,
+        onClick: () => hudBridge.sendCommand({ type: 'formation' }),
+      };
     };
+
+    const selectAllSoldiers = (idx: number) => {
+      arr[idx] = {
+        key: 'Z',
+        label: 'Alle sold',
+        icon: <AntIcon size={36} kind="soldier" />,
+        onClick: () => hudBridge.sendCommand({ type: 'select-all-soldiers' }),
+      };
+    };
+
+    const selectAllWorkers = (idx: number) => {
+      arr[idx] = {
+        key: 'X',
+        label: 'Alle arb',
+        icon: <AntIcon size={36} kind="worker" />,
+        onClick: () => hudBridge.sendCommand({ type: 'select-all-workers' }),
+      };
+    };
+
+    const clearSlot = (idx: number) => {
+      arr[idx] = {
+        key: 'Esc',
+        label: 'Rydd',
+        icon: <span style={{ fontSize: 30, color: '#a89878', lineHeight: 1 }}>✕</span>,
+        onClick: () => hudBridge.sendCommand({ type: 'clear-selection' }),
+      };
+    };
+
+    // ── Regler ──────────────────────────────────────────────────────────
+    // Rad 2-3: bygg-knapper alltid synlige
+    towerSlots();
+    buildingSlots();
+    clearSlot(11);
+
+    if (sel.kind === 'building' && sel.building?.faction === 'player') {
+      // Bygning under konstruksjon kan ikke trene enheter.
+      const isFunctional = !sel.building.underConstruction;
+      if (sel.building.kind === 'base' && isFunctional) {
+        // Maurtua trener workers (Starcraft-stil: town hall produserer arbeiderne).
+        trainWorkerSlot(0);
+        defenseSlot(!!sel.building.hasDefense);
+      } else if (sel.building.kind === 'barracks' && isFunctional) {
+        // Barakka trener kun soldater (workers kommer fra maurtua).
+        trainSoldierSlot(0);
+      }
+    } else if (sel.kind === 'units') {
+      const hasSoldiers = (sel.soldiers ?? 0) >= 1;
+      const hasMultipleSoldiers = (sel.soldiers ?? 0) >= 2;
+      const hasWorkers = (sel.workers ?? 0) >= 1;
+
+      let slot = 0;
+      if (hasMultipleSoldiers) { formationSlot(slot++); }
+      if (hasSoldiers) { selectAllSoldiers(slot++); }
+      if (hasWorkers) { selectAllWorkers(slot++); }
+    }
+    // sel.kind === 'none' → ingen rad-1-handlinger, men bygg-rader er fortsatt synlige
 
     return arr;
   }, [sel, s.player.gold, s.costs.worker, s.costs.soldier]);
 
   return (
-    <div className="rts-section rts-command-section">
+    <div className="rts-panel rts-command-panel">
       <div className="rts-section-title">Kommandoer</div>
       <div className="rts-command-grid">
         {slots.map((slot, i) => <CmdButton key={i} slot={slot} />)}
@@ -534,18 +766,110 @@ function CommandCard({ s }: { s: HudState }) {
 
 function GameOver({ s }: { s: HudState }) {
   if (s.state === 'running') return null;
+  const st = s.stats;
   return (
     <div className="rts-gameover">
       <div className={`rts-gameover-title ${s.state}`}>
         {s.state === 'won' ? 'SEIER' : 'TAPT'}
       </div>
-      <div className="rts-gameover-stats">
-        <span>Tid <strong>{formatTime(s.time)}</strong></span>
-        <span>Maur trent <strong>{s.stats.trained}</strong></span>
-        <span>Mat samlet <strong>{s.stats.goldEarned}</strong></span>
+      <div className="rts-gameover-stats-grid">
+        <div><span>Tid</span><strong>{formatTime(s.time)}</strong></div>
+        <div><span>Soldater trent</span><strong>{st.soldiersTrained}</strong></div>
+        <div><span>Arbeidere trent</span><strong>{st.workersTrained}</strong></div>
+        <div><span>Mat samlet</span><strong>{st.goldEarned}</strong></div>
+        <div><span>Fiende-drap</span><strong>{st.enemyKills}</strong></div>
+        <div><span>Egne tap</span><strong>{st.unitsLost}</strong></div>
+        <div><span>Maks miner holdt</span><strong>{st.peakMines}</strong></div>
+        <div><span>Tårn bygget</span><strong>{st.playerTowers}</strong></div>
       </div>
-      <div className="rts-gameover-hint">
-        Trykk <kbd>R</kbd> for å starte på nytt
+      <div className="rts-gameover-actions">
+        <button
+          className="rts-gameover-btn primary"
+          onClick={() => hudBridge.sendCommand({ type: 'restart' })}
+        >
+          ↻ Spill igjen <kbd>R</kbd>
+        </button>
+        <button
+          className="rts-gameover-btn"
+          onClick={() => hudBridge.sendCommand({ type: 'to-menu' })}
+        >
+          Til hovedmeny
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Hotkeys cheat-sheet (V8) ──────────────────────────────────────────
+
+const HOTKEYS: Array<{ section: string; keys: Array<[string, string]> }> = [
+  {
+    section: 'Kamera & seleksjon',
+    keys: [
+      ['WASD / piltaster', 'Panorér kamera'],
+      ['Klikk minimap', 'Pan til punkt'],
+      ['Shift / Høyreklikk minimap', 'Attack-move til punkt'],
+      ['Klikk enhet', 'Velg enhet'],
+      ['Dobbeltklikk enhet', 'Velg alle samme type på skjermen'],
+      ['Dra', 'Box-select'],
+      ['Shift+klikk', 'Legg til i seleksjon'],
+      ['Esc', 'Rydd seleksjon / avbryt'],
+    ],
+  },
+  {
+    section: 'Trening & bygg',
+    keys: [
+      ['Q', 'Tren arbeider (fra maurtua)'],
+      ['E', 'Tren soldat (fra barakka)'],
+      ['B', 'Bygg-mode (barakke)'],
+      ['T', 'Bygg-mode (stinger-tårn)'],
+      ['1 / 2 / 3', 'Stinger / Webber / Spitter (i bygg-mode)'],
+      ['4 / 5 / 6 / 7', 'Barakke / Farm / Mur / Smie (i bygg-mode)'],
+      ['V', 'Forsvar-oppgradering (maurtua valgt)'],
+    ],
+  },
+  {
+    section: 'Kommandoer',
+    keys: [
+      ['Z', 'Velg alle soldater'],
+      ['X', 'Velg alle arbeidere'],
+      ['F', 'Linje-formasjon (med soldater valgt)'],
+      ['Høyreklikk', 'Flytt / angrep / mine / rally'],
+    ],
+  },
+  {
+    section: 'Spill',
+    keys: [
+      ['Mellomrom', 'Pause / fortsett'],
+      ['+ / −', 'Endre hastighet (1× / 2× / 3×)'],
+      ['H', 'Vis / skjul denne hjelpen'],
+      ['R', 'Restart (etter game over)'],
+    ],
+  },
+];
+
+function HotkeysPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="rts-hotkeys-overlay" onClick={onClose}>
+      <div className="rts-hotkeys-card" onClick={(e) => e.stopPropagation()}>
+        <div className="rts-hotkeys-header">
+          <div className="rts-hotkeys-title">Hurtigtaster</div>
+          <button className="rts-hotkeys-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="rts-hotkeys-body">
+          {HOTKEYS.map((sec) => (
+            <div className="rts-hotkeys-section" key={sec.section}>
+              <div className="rts-hotkeys-section-title">{sec.section}</div>
+              {sec.keys.map(([k, desc]) => (
+                <div className="rts-hotkeys-row" key={k}>
+                  <kbd>{k}</kbd>
+                  <span>{desc}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="rts-hotkeys-footer">Trykk H eller Esc for å lukke</div>
       </div>
     </div>
   );
@@ -590,18 +914,13 @@ function WaveBanner({ s }: { s: HudState }) {
 
 function BuildModeBanner({ s }: { s: HudState }) {
   if (!s.buildMode) return null;
-  const labels: Record<TowerKind, string> = {
-    stinger: 'Spydd-tårn',
-    webber:  'Nett-tårn',
-    spitter: 'Spytt-tårn',
-  };
   return (
     <div className="rts-build-banner">
-      <span className="rts-build-icon"><TowerIcon size={26} kind={s.buildMode.towerType} /></span>
+      <span className="rts-build-icon"><BuildKindIcon size={26} kind={s.buildMode.kind} /></span>
       <div className="rts-build-info">
-        <div className="rts-build-title">Bygger {labels[s.buildMode.towerType]} — {s.buildMode.cost} mat</div>
+        <div className="rts-build-title">Bygger {BUILD_KIND_LABELS[s.buildMode.kind]} — {s.buildMode.cost} mat</div>
         <div className="rts-build-hint">
-          1/2/3 bytter type · venstreklikk plasserer · Shift = bygg flere · Esc/høyreklikk avbryter
+          1/2/3 = tårn · 4 = barakke · 5/6/7 = farm/mur/våpenkammer · venstreklikk plasserer (worker bygger) · Esc avbryter
         </div>
       </div>
       <button
@@ -617,9 +936,29 @@ function BuildModeBanner({ s }: { s: HudState }) {
 
 export function HudOverlay() {
   const [state, setState] = useState<HudState | null>(null);
+  const [showHotkeys, setShowHotkeys] = useState(false);
 
   const onState = useCallback((s: HudState) => setState(s), []);
   useEffect(() => hudBridge.onState(onState), [onState]);
+
+  // V8 — H-tast toggler hotkey-overlay. Esc lukker den.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ignorer modifier-kombinasjoner og input-felter
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === 'h' || e.key === 'H' || e.key === '?') {
+        setShowHotkeys((v) => !v);
+        e.preventDefault();
+      } else if (e.key === 'Escape' && showHotkeys) {
+        setShowHotkeys(false);
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showHotkeys]);
 
   if (!state) return null;
 
@@ -629,12 +968,18 @@ export function HudOverlay() {
       <WaveBanner s={state} />
       <AlertBanner s={state} />
       <BuildModeBanner s={state} />
-      <div className="rts-bottom">
-        <Minimap s={state} />
-        <InfoPanel s={state} />
-        <CommandCard s={state} />
-      </div>
+      <Minimap s={state} />
+      <InfoPanel s={state} />
+      <CommandCard s={state} />
       <GameOver s={state} />
+      <button
+        className="rts-help-fab"
+        type="button"
+        title="Hurtigtaster (H)"
+        aria-label="Vis hurtigtaster"
+        onClick={() => setShowHotkeys(true)}
+      >?</button>
+      {showHotkeys && <HotkeysPanel onClose={() => setShowHotkeys(false)} />}
     </div>
   );
 }
