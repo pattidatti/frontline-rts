@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG, THEME } from '../config';
 import { VFXManager } from '../vfx';
-import { hudBridge, type HudState, type HudCommand, type HudUnit, type HudBuilding, type HudSelection, type HudBuildMode, type HudWaveState, type TowerKind } from '../hudBridge';
+import { hudBridge, type HudState, type HudCommand, type HudUnit, type HudBuilding, type HudSelection, type HudBuildMode, type HudWaveState, type TowerKind, type BuildKind } from '../hudBridge';
 import { pointInPolygon, segmentCrossesPolyline } from '../geom';
 import { playSfx, LoopingSfx } from '../audio';
 
@@ -15,6 +15,29 @@ interface River {
   bridges: BuildingData[];
 }
 
+/** Impassabel terreng-bit (steinformasjon). Blokkerer bevegelse, kan ikke angripes. */
+interface Obstacle {
+  x: number; y: number;
+  /** Sirkulær blokkering — units holdes utenfor denne radien. */
+  radius: number;
+}
+
+/**
+ * Forhøyet platå (SC-stil høyt land). Aksial rektangulær topp, omgitt av cliffs.
+ * Ramper er åpninger i cliffs der units kan stige opp/ned.
+ */
+interface Ramp {
+  side: 'top' | 'bottom' | 'left' | 'right';
+  /** x for top/bottom, y for left/right — start på åpningen */
+  from: number;
+  /** x for top/bottom, y for left/right — slutt på åpningen */
+  to: number;
+}
+interface Plateau {
+  x: number; y: number; w: number; h: number;
+  ramps: Ramp[];
+}
+
 interface UnitData {
   id: number;
   faction: 'player' | 'ai';
@@ -23,10 +46,13 @@ interface UnitData {
   hp: number; maxHp: number;
   speed: number; damage: number;
   attackRange: number; attackInterval: number; lastAttackAt: number;
-  state: 'idle' | 'moving' | 'attacking' | 'mining';
+  state: 'idle' | 'moving' | 'attacking' | 'mining' | 'building';
   moveTarget: Vec2 | null;
   attackTarget: UnitData | BuildingData | null;
   mineTarget: MineData | null;
+  /** Worker som er tildelt en bygning under konstruksjon — settes når plassering skjer
+   *  eller når worker høyreklikker et byggested for å resume. */
+  buildTarget: BuildingData | null;
   selected: boolean;
   dead: boolean;
   container: Phaser.GameObjects.Container;
@@ -37,6 +63,7 @@ interface UnitData {
   hpBg: Phaser.GameObjects.Rectangle;
   hpFg: Phaser.GameObjects.Rectangle;
   selectionRing: Phaser.GameObjects.Arc;
+  selectionGlow: Phaser.GameObjects.Arc;
   selectionTween: Phaser.Tweens.Tween | null;
   radius: number;
   lastDx: number; lastDy: number;
@@ -46,7 +73,7 @@ interface UnitData {
 
 interface BuildingData {
   id: number;
-  kind: 'base' | 'barracks' | 'mine' | 'bridge' | 'tower';
+  kind: 'base' | 'barracks' | 'mine' | 'bridge' | 'tower' | 'farm' | 'wall' | 'armory';
   faction: 'player' | 'ai' | 'neutral';
   x: number; y: number; w: number; h: number;
   hp: number; maxHp: number;
@@ -55,6 +82,8 @@ interface BuildingData {
   hpBg: Phaser.GameObjects.Rectangle;
   hpFg: Phaser.GameObjects.Rectangle;
   dead?: boolean;
+  /** Hvis true tar bygningen ingen skade og kan ikke targetes. Brukes for broer (terreng). */
+  invulnerable?: boolean;
   /** Klikkbar etikett over bygningen (skjules ved død). */
   label?: Phaser.GameObjects.Text;
   /** Kun for 'bridge'. Container med alle bro-visuals — skjules ved død. */
@@ -71,6 +100,25 @@ interface BuildingData {
     slow: number;
     lastFireAt: number;
   };
+  /** M3.1 — Visuell container for farm/wall/armory. Skjules ved død. */
+  buildingContainer?: Phaser.GameObjects.Container;
+  /** M3.2 — base defense state (kun på 'base' med Forsvar kjøpt). */
+  defense?: {
+    range: number;
+    damage: number;
+    fireRate: number;
+    lastFireAt: number;
+  };
+  /** True mens en worker konstruerer bygningen. Bygningen er ikke funksjonell og
+   *  vises med lav alpha + progress-bar. HP lerper fra 25 % → 100 % under bygging. */
+  underConstruction?: boolean;
+  /** Konstruksjonsprogress 0..1. Undefined når ferdig. */
+  buildProgress?: number;
+  /** Total konstruksjonstid (ms) for denne bygningen. */
+  buildTimeMs?: number;
+  /** Grafikk for HP/progress-bar under bygging. Skjules når ferdig. */
+  buildProgressBg?: Phaser.GameObjects.Rectangle;
+  buildProgressFg?: Phaser.GameObjects.Rectangle;
 }
 
 type MineControl = 'player' | 'ai' | 'contested' | null;
@@ -78,6 +126,9 @@ type MineData = BuildingData & {
   kind: 'mine'; faction: 'neutral';
   control: MineControl;
   controlRing: Phaser.GameObjects.Arc;
+  /** V3 — antall ticks med kun-motstander-i-radius siden forrige reset. Brukes for sticky ownership. */
+  flipPressurePlayer: number;
+  flipPressureAi: number;
 };
 
 function isUnit(t: UnitData | BuildingData): t is UnitData {
@@ -99,10 +150,16 @@ export class GameScene extends Phaser.Scene {
   private mines: MineData[] = [];
   private bridges: BuildingData[] = [];
   private rivers: River[] = [];
+  private obstacles: Obstacle[] = [];
+  private plateaus: Plateau[] = [];
+  /** Half-tykkelse på cliff-blokkering rundt platåets perimeter. */
+  private static readonly CLIFF_THICKNESS = 14;
   private playerBase!: BuildingData;
   private aiBase!: BuildingData;
-  private playerBarracks!: BuildingData;
-  private aiBarracks!: BuildingData;
+  /** Barakke må bygges av en worker — null til den er plassert (og fortsatt under konstruksjon
+   *  er tillatt; gate på `!underConstruction` der det matters). */
+  private playerBarracks: BuildingData | null = null;
+  private aiBarracks: BuildingData | null = null;
 
   private playerGold = 0;
   private aiGold = 0;
@@ -151,6 +208,8 @@ export class GameScene extends Phaser.Scene {
 
   // M1.5 — enemy alert state
   private lastEnemyAlertAt = 0;
+  /** V4 — tidsstempel for forrige *emitterte* alarm (separat fra check-intervallet). Brukes for debounce. */
+  private lastAlertEmittedAt = 0;
   private currentAlert: { message: string; urgency: 'critical' | 'warn'; triggeredAt: number } | null = null;
 
   // M1.4 — looping base-alarm (under 50 % HP)
@@ -158,13 +217,27 @@ export class GameScene extends Phaser.Scene {
 
   // M2.1 — Tower-bygging
   private towers: BuildingData[] = [];
+  /** K5 — tidsstempel (ms) for forrige AI-tårn-bygg. Debounces AI tower-build. */
+  private lastAiTowerBuildAt = 0;
+  /** V7 — stats for game-over panel. */
+  private statsSoldiersTrained = 0;
+  private statsWorkersTrained = 0;
+  private statsEnemyKills = 0;
+  private statsUnitsLost = 0;
+  /** V7 — peak mines kontrollert under runden. */
+  private statsPeakMines = 0;
+  /** M2.1 / M3.1 — generisk build-mode (tower eller building). */
   private buildMode: {
-    towerType: TowerKind;
+    kind: BuildKind;
     ghostBody: Phaser.GameObjects.Graphics;
     ghostRange: Phaser.GameObjects.Graphics;
     valid: boolean;
   } | null = null;
   private buildRadiusRing: Phaser.GameObjects.Graphics | null = null;
+  /** M3.1 — farms gir +bonusGoldPerTick per tick i mineTick. */
+  private farms: BuildingData[] = [];
+  /** M3.1 — walls blokkerer unit-bevegelse. */
+  private walls: BuildingData[] = [];
 
   // M2.2 — Wave Defence
   private waveActive: boolean = false;
@@ -185,6 +258,10 @@ export class GameScene extends Phaser.Scene {
     this.mines = [];
     this.bridges = [];
     this.rivers = [];
+    this.obstacles = [];
+    this.plateaus = [];
+    this.playerBarracks = null;
+    this.aiBarracks = null;
     this.selectedUnits = [];
     this.selectedBuilding = null;
     this.rallyPoint = null;
@@ -204,8 +281,17 @@ export class GameScene extends Phaser.Scene {
     this.gameSpeed = CONFIG.DEFAULT_TIME_SCALE;
     this.prePauseSpeed = CONFIG.DEFAULT_TIME_SCALE;
     this.lastEnemyAlertAt = 0;
+    this.lastAlertEmittedAt = 0;
     this.currentAlert = null;
     this.towers = [];
+    this.lastAiTowerBuildAt = 0;
+    this.statsSoldiersTrained = 0;
+    this.statsWorkersTrained = 0;
+    this.statsEnemyKills = 0;
+    this.statsUnitsLost = 0;
+    this.statsPeakMines = 0;
+    this.farms = [];
+    this.walls = [];
     this.buildMode = null;
     this.buildRadiusRing = null;
     this.waveActive = false;
@@ -318,31 +404,30 @@ export class GameScene extends Phaser.Scene {
     }
 
 
-    // Drag selection box (tan/sand for ant theme)
-    this.dragRect = this.add.rectangle(0, 0, 1, 1, 0xddcc88, 0.15)
-      .setStrokeStyle(1, 0xddcc88, 0.85)
+    // Drag selection box — varm orange for synlighet
+    this.dragRect = this.add.rectangle(0, 0, 1, 1, 0xff9d4a, 0.18)
+      .setStrokeStyle(2, 0xffb878, 0.95)
       .setOrigin(0, 0)
       .setVisible(false)
       .setDepth(20);
 
-    // Broer (T1-C) — plasseres på elv-tverring (x=1280). Lages før elv-tegning
+    // Broer (T1-C) — plasseres på horisontal elv (y=720). Lages før elv-tegning
     // så elven kan referere til dem som krysspunkter for waypoint-routing.
-    // Bredde 170 × høyde 100 (horisontal orientering — krysser vertikal elv).
-    const bridgeA = this.createBridge(1280, 480, 170, 100);
-    const bridgeB = this.createBridge(1280, 960, 170, 100);
+    // Bro-orientering: bredde 100 × høyde 170 (krysser horisontal elv nord-sør).
+    const bridgeA = this.createBridge(640, 720, 100, 170);   // Vest-bro
+    const bridgeB = this.createBridge(1920, 720, 100, 170);  // Øst-bro
 
-    // Elv (T1-B) — vertikal stripe midt på kartet, ~120px bred. Skiller
-    // player (vest) fra AI (øst) og gjør broene til reelle chokepoints.
-    // Tegnet under bro-laget (depth 1 → broer på depth 2 ligger over).
-    const RIVER_X = 1280;
+    // Elv (T1-B) — horisontal stripe midt på kartet, ~120px tykk. Skiller
+    // player (sør) fra AI (nord) og gjør broene til reelle chokepoints.
+    const RIVER_Y = 720;
     const RIVER_HALF = 60;
     const river: River = {
-      centerLine: [{ x: RIVER_X, y: 0 }, { x: RIVER_X, y: H }],
+      centerLine: [{ x: 0, y: RIVER_Y }, { x: W, y: RIVER_Y }],
       polygon: [
-        { x: RIVER_X - RIVER_HALF, y: 0 },
-        { x: RIVER_X + RIVER_HALF, y: 0 },
-        { x: RIVER_X + RIVER_HALF, y: H },
-        { x: RIVER_X - RIVER_HALF, y: H },
+        { x: 0, y: RIVER_Y - RIVER_HALF },
+        { x: W, y: RIVER_Y - RIVER_HALF },
+        { x: W, y: RIVER_Y + RIVER_HALF },
+        { x: 0, y: RIVER_Y + RIVER_HALF },
       ],
       bridges: [bridgeA, bridgeB],
     };
@@ -350,47 +435,85 @@ export class GameScene extends Phaser.Scene {
 
     // Render elv-laget
     const rivGfx = this.add.graphics().setDepth(1);
-    rivGfx.fillGradientStyle(0x2c4a7a, 0x1a3258, 0x2c4a7a, 0x1a3258, 0.95);
-    rivGfx.fillRect(RIVER_X - RIVER_HALF, 0, RIVER_HALF * 2, H);
-    // Mørk kant-linje vest/øst
+    rivGfx.fillGradientStyle(0x2c4a7a, 0x2c4a7a, 0x1a3258, 0x1a3258, 0.95);
+    rivGfx.fillRect(0, RIVER_Y - RIVER_HALF, W, RIVER_HALF * 2);
+    // Mørk kant-linje nord/sør
     rivGfx.lineStyle(2, 0x14233e, 0.85);
-    rivGfx.lineBetween(RIVER_X - RIVER_HALF, 0, RIVER_X - RIVER_HALF, H);
-    rivGfx.lineBetween(RIVER_X + RIVER_HALF, 0, RIVER_X + RIVER_HALF, H);
-    // Bølge-streker for tekstur (vertikale linjer med sinus-forskyvning på x)
+    rivGfx.lineBetween(0, RIVER_Y - RIVER_HALF, W, RIVER_Y - RIVER_HALF);
+    rivGfx.lineBetween(0, RIVER_Y + RIVER_HALF, W, RIVER_Y + RIVER_HALF);
+    // Bølge-streker for tekstur (horisontale linjer med sinus-forskyvning på y)
     rivGfx.lineStyle(1, 0x6a8ec0, 0.35);
     for (let i = 0; i < 5; i++) {
-      const xo = -RIVER_HALF + (i + 0.5) * (RIVER_HALF * 2 / 5);
+      const yo = -RIVER_HALF + (i + 0.5) * (RIVER_HALF * 2 / 5);
       rivGfx.beginPath();
-      rivGfx.moveTo(RIVER_X + xo, 0);
-      for (let y = 0; y <= H; y += 40) {
-        rivGfx.lineTo(RIVER_X + xo + Math.sin((y + i * 30) * 0.025) * 4, y);
+      rivGfx.moveTo(0, RIVER_Y + yo);
+      for (let x = 0; x <= W; x += 40) {
+        rivGfx.lineTo(x, RIVER_Y + yo + Math.sin((x + i * 30) * 0.025) * 4);
       }
       rivGfx.strokePath();
     }
 
-    // Mines — 6 totalt: 2 trygge ved hver base + 2 omkjempete ved elven.
-    // Trygge mines gir stabil hjemme-økonomi (~4s pendling for workers),
-    // contested-mines i sentrum belønner taktisk fremrykk.
-    this.createMine(300, 500);    // Player NW (trygg)
-    this.createMine(300, 940);    // Player SW (trygg)
-    this.createMine(2260, 500);   // AI NE (trygg)
-    this.createMine(2260, 940);   // AI SE (trygg)
-    this.createMine(900, 720);    // Contested (player-side, ved elv)
-    this.createMine(1660, 720);   // Contested (AI-side, ved elv)
+    // Platåer (SC-stil høyt land) — én kompakt platå per side, ikke gigantisk.
+    // Player platå sør, AI platå nord. 3 ramper hver: 1 base-side + 2 bro-side.
+    // Contested mine på platået — high-ground = strategisk verdi.
+    const playerPlateau: Plateau = {
+      x: 1020, y: 930, w: 520, h: 260,
+      ramps: [
+        { side: 'bottom', from: 1240, to: 1340 },  // Base-side (mot sør)
+        { side: 'top',    from: 1040, to: 1140 },  // Vest-bro tilgang
+        { side: 'top',    from: 1420, to: 1520 },  // Øst-bro tilgang
+      ],
+    };
+    const aiPlateau: Plateau = {
+      x: 1020, y: 250, w: 520, h: 260,
+      ramps: [
+        { side: 'top',    from: 1240, to: 1340 },  // Base-side (mot nord)
+        { side: 'bottom', from: 1040, to: 1140 },  // Vest-bro tilgang
+        { side: 'bottom', from: 1420, to: 1520 },  // Øst-bro tilgang
+      ],
+    };
+    this.plateaus.push(playerPlateau, aiPlateau);
+    this.renderPlateaus();
 
-    // Buildings
-    this.playerBase = this.createBuilding('base', 'player', 80, H / 2, 60, 80, CONFIG.BASE_HP);
-    this.aiBase = this.createBuilding('base', 'ai', W - 80, H / 2, 60, 80, CONFIG.BASE_HP);
-    this.playerBarracks = this.createBuilding('barracks', 'player', 175, H / 2 + 130, 50, 38, 200);
-    this.aiBarracks = this.createBuilding('barracks', 'ai', W - 175, H / 2 - 130, 50, 38, 200);
+    // Mines — 6 totalt: 2 trygge ved hver base + 2 omkjempete på platåene.
+    // Trygge mines flankerer basene; contested mines er på høyt land.
+    this.createMine(900, 1300);   // Player SW (trygg, sør)
+    this.createMine(1660, 1300);  // Player SE (trygg, sør)
+    this.createMine(900, 140);    // AI NW (trygg, nord)
+    this.createMine(1660, 140);   // AI NE (trygg, nord)
+    this.createMine(1280, 1060);  // Contested (player platå)
+    this.createMine(1280, 380);   // Contested (AI platå)
+
+    // Steinformasjoner — cover + flanker i lavlandet, speilet nord/sør.
+    // Hjørne-stoner langt fra senterlinjen — gir karakter til kart-ytterkant
+    this.createObstacle(260, 1280, 58);    // SW player-lavland
+    this.createObstacle(2300, 1280, 58);   // SE player-lavland
+    this.createObstacle(260, 160, 58);     // NW AI-lavland
+    this.createObstacle(2300, 160, 58);    // NE AI-lavland
+    // Mid-flank stones mellom platå og bro-tilgang (i smal lavlands-stripe ved elven)
+    this.createObstacle(1280, 850, 38);    // Sør for elv, mellom plateau-toppen og elven (player-side)
+    this.createObstacle(1280, 590, 38);    // Nord for elv (AI-side)
+    // Cover INNE på platåene — beskytter contested mines
+    this.createObstacle(1100, 1060, 28);   // Cover vest for player contested mine
+    this.createObstacle(1460, 1060, 28);   // Cover øst for player contested mine
+    this.createObstacle(1100, 380, 28);    // Cover vest for AI contested mine
+    this.createObstacle(1460, 380, 28);    // Cover øst for AI contested mine
+
+    // Jord/mose-flekker for visuell variasjon (rene dekorasjoner, blokkerer ikke)
+    this.paintGroundPatches(W, H);
+
+    // Buildings — kun maurtuene er pre-plassert. Barakker bygges av workers.
+    // Player base i sør, AI base i nord.
+    this.playerBase = this.createBuilding('base', 'player', W / 2, H - 80, 60, 80, CONFIG.BASE_HP);
+    this.aiBase = this.createBuilding('base', 'ai', W / 2, 80, 60, 80, CONFIG.BASE_HP);
 
     // Starting economy
     this.playerGold = CONFIG.STARTING_GOLD;
     this.aiGold = CONFIG.STARTING_GOLD;
 
-    // Initial units
-    this.spawnUnit('player', 'worker', 160, H / 2);
-    this.spawnUnit('ai', 'worker', W - 160, H / 2);
+    // Initial units — 1 worker per side, spawnet rett foran egen base.
+    this.spawnUnit('player', 'worker', W / 2, H - 160);
+    this.spawnUnit('ai', 'worker', W / 2, 160);
 
     // HUD rendered by React overlay (see HudOverlay.tsx).
     // We just keep a hover-indicator graphics layer here.
@@ -428,20 +551,23 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-NUMPAD_SUBTRACT', () => this.cycleSpeed(-1));
 
     // M2.1 — tower-bygging. T toggler build-mode (default stinger).
-    // I build-mode: 1/2/3 bytter tower-type, Esc/høyreklikk avbryter.
+    // M3.1 — B toggler bygg-modus (default barracks — viktigste tidligbygg).
+    // I build-mode: 1/2/3 = towers, 4 = barakke, 5/6/7 = farm/wall/armory. Esc/høyreklikk avbryter.
     this.input.keyboard?.on('keydown-T', () => {
       if (this.buildMode) this.cancelBuildMode();
       else this.startBuildMode('stinger');
     });
-    this.input.keyboard?.on('keydown-ONE', () => {
-      if (this.buildMode) this.startBuildMode('stinger');
+    this.input.keyboard?.on('keydown-B', () => {
+      if (this.buildMode) this.cancelBuildMode();
+      else this.startBuildMode('barracks');
     });
-    this.input.keyboard?.on('keydown-TWO', () => {
-      if (this.buildMode) this.startBuildMode('webber');
-    });
-    this.input.keyboard?.on('keydown-THREE', () => {
-      if (this.buildMode) this.startBuildMode('spitter');
-    });
+    this.input.keyboard?.on('keydown-ONE',   () => { if (this.buildMode) this.startBuildMode('stinger');  });
+    this.input.keyboard?.on('keydown-TWO',   () => { if (this.buildMode) this.startBuildMode('webber');   });
+    this.input.keyboard?.on('keydown-THREE', () => { if (this.buildMode) this.startBuildMode('spitter');  });
+    this.input.keyboard?.on('keydown-FOUR',  () => { if (this.buildMode) this.startBuildMode('barracks'); });
+    this.input.keyboard?.on('keydown-FIVE',  () => { if (this.buildMode) this.startBuildMode('farm');     });
+    this.input.keyboard?.on('keydown-SIX',   () => { if (this.buildMode) this.startBuildMode('wall');     });
+    this.input.keyboard?.on('keydown-SEVEN', () => { if (this.buildMode) this.startBuildMode('armory');   });
 
     // M2.3 — choke-formasjon (F)
     this.input.keyboard?.on('keydown-F', () => this.formationLine());
@@ -474,11 +600,11 @@ export class GameScene extends Phaser.Scene {
     // Kamera-bounds matcher verden; viewport-størrelse styres av Phaser.Scale.FIT.
     this.cameras.main.setBounds(0, 0, CONFIG.MAP_WIDTH, CONFIG.MAP_HEIGHT);
     if (CONFIG.DEMO_MODE) {
-      // Demo: sentrer på nordbroa — viser elva, broa og sentrum-handling uten å stirre rett i vannet.
-      this.cameras.main.centerOn(CONFIG.MAP_WIDTH / 2, 480);
+      // Demo: sentrer på midten av elva — viser begge broer og handlingen i mid-zone.
+      this.cameras.main.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);
     } else {
-      // Spiller starter med kameraet på sin egen base
-      this.cameras.main.centerOn(80, CONFIG.MAP_HEIGHT / 2);
+      // Spiller starter med kameraet på egen base (sør)
+      this.cameras.main.centerOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT - 100);
     }
 
     // Timers
@@ -660,10 +786,10 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Inngangshull — peker mot midten av kartet. Plassert på skråningen (ikke på toppen).
-    const entranceDir = x < CONFIG.MAP_WIDTH / 2 ? 1 : -1;
-    const entranceX = x + entranceDir * R * 0.45;
-    const entranceY = y + R * 0.2;
+    // Inngangshull — peker mot midten av kartet (vertikal akse). Plassert på skråningen.
+    const entranceDir = y < CONFIG.MAP_HEIGHT / 2 ? 1 : -1;
+    const entranceX = x;
+    const entranceY = y + entranceDir * R * 0.45;
     if (kind === 'base') {
       // Hovedinngang — opphøyd jordkrater + mørkt hull
       this.add.circle(entranceX, entranceY, R * 0.22, rim, 0.95).setDepth(6);
@@ -705,12 +831,18 @@ export class GameScene extends Phaser.Scene {
 
   /** Tegner en liten etikett over bygningen så spillere ser hva ting er ved første blikk. */
   private attachBuildingLabel(b: BuildingData) {
+    const baseLabel = CONFIG.LABELS.base.toUpperCase();
+    const barracksLabel = CONFIG.LABELS.barracks.toUpperCase();
+    const mineLabel = CONFIG.LABELS.mine.toUpperCase();
     const text =
-      b.kind === 'base'     ? (b.faction === 'player' ? 'BASE' : 'FIENDE-BASE')
-      : b.kind === 'barracks' ? (b.faction === 'player' ? 'BARAKKE' : 'FIENDE-BARAKKE')
-      : b.kind === 'mine'   ? 'BLADLUSFARM'
+      b.kind === 'base'     ? (b.faction === 'player' ? baseLabel : `FIENDE-${baseLabel}`)
+      : b.kind === 'barracks' ? (b.faction === 'player' ? barracksLabel : `FIENDE-${barracksLabel}`)
+      : b.kind === 'mine'   ? mineLabel
       : b.kind === 'bridge' ? 'BRO'
       : b.kind === 'tower'  ? (b.tower?.type === 'webber' ? 'NETT-TÅRN' : b.tower?.type === 'spitter' ? 'SPYTT-TÅRN' : 'SPYDD-TÅRN')
+      : b.kind === 'farm'   ? 'AVLSFARM'
+      : b.kind === 'wall'   ? 'MUR'
+      : b.kind === 'armory' ? 'SMIE'
       : '';
     if (!text) return;
     const color = b.faction === 'player' ? '#cfe3a3'
@@ -720,15 +852,23 @@ export class GameScene extends Phaser.Scene {
     const yOffset = b.kind === 'base' ? -b.h * 0.95
       : b.kind === 'barracks' ? -b.h * 0.85
       : b.kind === 'mine' ? -b.h * 0.95
+      : b.kind === 'tower' ? -b.h * 0.75
+      : b.kind === 'farm' || b.kind === 'wall' || b.kind === 'armory' ? -b.h * 0.8
       : -b.h * 0.6; // bro
+    const dpr = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
     b.label = this.add.text(b.x, b.y + yOffset, text, {
       fontFamily: 'Inter, system-ui, sans-serif',
-      fontSize: '11px',
+      fontSize: '14px',
       color,
       fontStyle: 'bold',
       stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5, 1).setDepth(9).setAlpha(0.85);
+      strokeThickness: 5,
+      shadow: { offsetX: 0, offsetY: 2, color: '#000000', blur: 4, fill: true, stroke: true },
+    })
+      .setOrigin(0.5, 1)
+      .setDepth(11)
+      .setAlpha(1)
+      .setResolution(dpr);
   }
 
   /** Bro = nøytral destroyable bygning. Tegnes som trebro, faller når HP når 0. */
@@ -770,6 +910,7 @@ export class GameScene extends Phaser.Scene {
       hp: CONFIG.BRIDGE_HP, maxHp: CONFIG.BRIDGE_HP,
       body, bodyColor: 0x7a5a32, hpBg, hpFg,
       bridgeContainer: container,
+      invulnerable: true,
     };
     this.attachBuildingLabel(b);
     this.buildings.push(b);
@@ -867,6 +1008,7 @@ export class GameScene extends Phaser.Scene {
       x, y, w: leafW, h: leafH,
       hp: 9999, maxHp: 9999, body, bodyColor: THEME.APHID_LEAF_COLOR, hpBg, hpFg,
       control: null, controlRing,
+      flipPressurePlayer: 0, flipPressureAi: 0,
     };
     this.attachBuildingLabel(mine);
     this.buildings.push(mine);
@@ -875,7 +1017,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** M2.1 — bygg en tower for spilleren. Tegnes som steinsokkel + farget topp.  */
-  private createTower(type: TowerKind, x: number, y: number): BuildingData {
+  private createTower(type: TowerKind, x: number, y: number, faction: 'player' | 'ai' = 'player'): BuildingData {
     const spec = CONFIG.TOWER_TYPES[type];
     const w = 36, h = 44;
 
@@ -907,7 +1049,7 @@ export class GameScene extends Phaser.Scene {
     const hpFg = this.add.rectangle(x - 20, y - h / 2 - 6, 40, 4, 0x66bb44).setOrigin(0, 0.5).setDepth(8).setVisible(false);
 
     const b: BuildingData = {
-      id: this.nextId++, kind: 'tower', faction: 'player',
+      id: this.nextId++, kind: 'tower', faction,
       x, y, w, h,
       hp: spec.hp, maxHp: spec.hp,
       body, bodyColor: spec.color, hpBg, hpFg,
@@ -928,17 +1070,137 @@ export class GameScene extends Phaser.Scene {
     return b;
   }
 
-  /** Kan en tower plasseres på (x,y)? */
-  private canPlaceTower(x: number, y: number): boolean {
+  /** M3.1 — bygg farm/wall/armory for spilleren. Barakke håndteres separat via createBuilding. */
+  private createPlaceableBuilding(kind: 'farm' | 'wall' | 'armory', x: number, y: number): BuildingData {
+    const spec = CONFIG.BUILDING_TYPES[kind];
+    const w = spec.w, h = spec.h;
+
+    const shadow = this.add.ellipse(2, h * 0.42, w * 1.1, h * 0.32, 0x000000, 0.45);
+
+    const parts: Phaser.GameObjects.GameObject[] = [shadow];
+    if (kind === 'farm') {
+      // Bladlus-farm: stort blad-form med 3 bladlus oppå
+      const leaf = this.add.ellipse(0, 0, w, h, 0x4f8a3a).setStrokeStyle(1.4, 0x2a4a1c, 0.9);
+      const vein = this.add.rectangle(0, 0, w * 0.85, 1.5, 0x2a4a1c, 0.85);
+      const hl = this.add.ellipse(-w * 0.18, -h * 0.18, w * 0.45, h * 0.28, 0x6ba84a, 0.7);
+      parts.push(leaf, vein, hl);
+      // Bladlus
+      for (let i = 0; i < 3; i++) {
+        const lx = (i - 1) * 9;
+        const ly = -2 + Math.abs(i - 1) * 2;
+        parts.push(this.add.ellipse(lx, ly, 6, 4.5, 0x88dd66).setStrokeStyle(0.8, 0x356b22, 0.9));
+        parts.push(this.add.ellipse(lx - 1, ly - 1, 2, 1.4, 0xccff99, 0.7));
+      }
+    } else if (kind === 'wall') {
+      // Mursteinklump: solid stein med riller
+      const stone = this.add.rectangle(0, 0, w, h, 0x6c5a3a).setStrokeStyle(1.5, 0x2a1f12, 0.95);
+      const top = this.add.rectangle(0, -h * 0.32, w * 0.92, h * 0.22, 0x8a7a52, 0.85);
+      const crack = this.add.rectangle(0, h * 0.1, w * 0.65, 1.2, 0x2a1f12, 0.7);
+      const crack2 = this.add.rectangle(-w * 0.1, -h * 0.05, 1.2, h * 0.5, 0x2a1f12, 0.6);
+      parts.push(stone, top, crack, crack2);
+    } else { // armory
+      // Smie/våpenkammer: stein-bygning med ambolt-silhuett
+      const wallS = this.add.rectangle(0, h * 0.05, w, h * 0.85, 0x8a6a3a).setStrokeStyle(1.5, 0x3a2a18, 0.95);
+      const roof = this.add.triangle(0, -h * 0.32, -w / 2, h * 0.1, w / 2, h * 0.1, 0, -h * 0.4, 0x6c4a26).setStrokeStyle(1.2, 0x2a1f12, 0.9);
+      const door = this.add.rectangle(0, h * 0.22, w * 0.28, h * 0.32, 0x2a1f12);
+      // Liten ambolt-marker
+      const anvilTop = this.add.rectangle(0, -h * 0.06, w * 0.38, 2.4, 0x9aa0a8);
+      const anvilStem = this.add.rectangle(0, 0, w * 0.16, 4, 0x5a606a);
+      parts.push(wallS, roof, door, anvilTop, anvilStem);
+    }
+
+    const container = this.add.container(x, y, parts).setDepth(3);
+
+    const body = this.add.ellipse(x, y, w, h, 0x000000, 0).setDepth(3);
+
+    const hpBg = this.add.rectangle(x, y - h / 2 - 6, 40, 4, 0x222222).setDepth(8).setVisible(false);
+    const hpFg = this.add.rectangle(x - 20, y - h / 2 - 6, 40, 4, 0x66bb44).setOrigin(0, 0.5).setDepth(8).setVisible(false);
+
+    const b: BuildingData = {
+      id: this.nextId++, kind, faction: 'player',
+      x, y, w, h,
+      hp: spec.hp, maxHp: spec.hp,
+      body, bodyColor: spec.color, hpBg, hpFg,
+      buildingContainer: container,
+    };
+    this.attachBuildingLabel(b);
+    this.buildings.push(b);
+    if (kind === 'farm') this.farms.push(b);
+    if (kind === 'wall') this.walls.push(b);
+    return b;
+  }
+
+  /** M3.1 — er kind en tower-type? */
+  private isTowerKind(kind: BuildKind): kind is TowerKind {
+    return kind === 'stinger' || kind === 'webber' || kind === 'spitter';
+  }
+
+  /** M3.1 — hent build-spec for en buildable (tower eller building). */
+  private getBuildSpec(kind: BuildKind): { cost: number; hp: number; w: number; h: number; color: number; range: number } {
+    if (this.isTowerKind(kind)) {
+      const t = CONFIG.TOWER_TYPES[kind];
+      return { cost: t.cost, hp: t.hp, w: 36, h: 44, color: t.color, range: t.range };
+    }
+    if (kind === 'barracks') {
+      return { cost: CONFIG.BARRACKS_COST, hp: CONFIG.BARRACKS_HP, w: 50, h: 38, color: 0x6b4a2a, range: 0 };
+    }
+    const b = CONFIG.BUILDING_TYPES[kind];
+    return { cost: b.cost, hp: b.hp, w: b.w, h: b.h, color: b.color, range: 0 };
+  }
+
+  /** Konstruksjonstid (ms) for en buildable. */
+  private buildTimeFor(kind: BuildKind): number {
+    if (this.isTowerKind(kind)) return CONFIG.TOWER_BUILD_TIME;
+    if (kind === 'barracks') return CONFIG.BARRACKS_BUILD_TIME;
+    if (kind === 'farm') return CONFIG.FARM_BUILD_TIME;
+    if (kind === 'wall') return CONFIG.WALL_BUILD_TIME;
+    if (kind === 'armory') return CONFIG.ARMORY_BUILD_TIME;
+    return 5000;
+  }
+
+  /** Build-radius for en gitt buildable (towers og bygninger har ulik radius). */
+  private buildRadiusFor(kind: BuildKind): number {
+    return this.isTowerKind(kind) ? CONFIG.TOWER_BUILD_RADIUS : CONFIG.BUILD_RADIUS;
+  }
+
+  /** Klaring (min avstand til andre bygninger) for en gitt buildable. */
+  private placeClearanceFor(kind: BuildKind): number {
+    return this.isTowerKind(kind) ? CONFIG.TOWER_PLACE_CLEARANCE : CONFIG.BUILD_PLACE_CLEARANCE;
+  }
+
+  /** Velg en player-worker som passer best til en byggeoppgave (idle eller mining først). */
+  private pickAutoBuildWorker(): UnitData | null {
+    const workers = this.units.filter(u =>
+      u.faction === 'player' && u.type === 'worker' && !u.dead && u.state !== 'building',
+    );
+    if (workers.length === 0) return null;
+    const idle = workers.filter(u => u.state === 'idle');
+    const pool = idle.length > 0 ? idle : workers;
+    let best = pool[0];
+    let bestDist = Phaser.Math.Distance.Between(best.x, best.y, this.playerBase.x, this.playerBase.y);
+    for (let i = 1; i < pool.length; i++) {
+      const d = Phaser.Math.Distance.Between(pool[i].x, pool[i].y, this.playerBase.x, this.playerBase.y);
+      if (d < bestDist) { best = pool[i]; bestDist = d; }
+    }
+    return best;
+  }
+
+  /** Kan en buildable plasseres på (x,y)? Brukes for både towers og buildings. */
+  private canPlaceBuildable(kind: BuildKind, x: number, y: number): boolean {
     if (!this.playerBase || this.playerBase.hp <= 0) return false;
+    const radius = this.buildRadiusFor(kind);
     const dFromBase = Phaser.Math.Distance.Between(x, y, this.playerBase.x, this.playerBase.y);
-    if (dFromBase > CONFIG.TOWER_BUILD_RADIUS) return false;
+    if (dFromBase > radius) return false;
     // Innenfor verden
     if (x < 40 || x > CONFIG.MAP_WIDTH - 40 || y < 40 || y > CONFIG.MAP_HEIGHT - 40) return false;
     // Ikke på elv
     if (this.riverStateAt(x, y) !== 'land') return false;
+    // Ikke på steinformasjon
+    if (this.isBlockedByObstacle(x, y)) return false;
+    // Ikke på cliff-kant
+    if (this.isBlockedByCliff(x, y)) return false;
     // Klaring til andre bygninger
-    const c = CONFIG.TOWER_PLACE_CLEARANCE;
+    const c = this.placeClearanceFor(kind);
     for (const b of this.buildings) {
       if (b.dead || b.hp <= 0) continue;
       if (Phaser.Math.Distance.Between(x, y, b.x, b.y) < c) return false;
@@ -946,21 +1208,37 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  /** M2.1 — start build-mode for valgt tower-type. */
-  private startBuildMode(type: TowerKind) {
+  /** M2.1 / M3.1 — start build-mode for valgt buildable.
+   *  Worker er den eneste enheten som kan bygge — vi krever derfor at minst én
+   *  player-worker er valgt. Hvis ingen worker er valgt, auto-velges nærmeste idle. */
+  private startBuildMode(kind: BuildKind) {
     if (this.gameState !== 'running') return;
     if (this.playerBase.hp <= 0) return;
+
+    const hasWorker = this.selectedUnits.some(u => u.faction === 'player' && u.type === 'worker' && !u.dead);
+    if (!hasWorker) {
+      const auto = this.pickAutoBuildWorker();
+      if (!auto) {
+        this.vfx.floatText(this.playerBase.x, this.playerBase.y - 80, 'Trenger maur-arbeider', '#ee5544');
+        return;
+      }
+      this.clearSelection();
+      this.selectUnit(auto);
+      this.vfx.floatText(auto.x, auto.y - 22, 'BYGGER', '#ddff88');
+    }
+
     this.cancelBuildMode();
     const ghostBody = this.add.graphics().setDepth(24);
     const ghostRange = this.add.graphics().setDepth(23);
-    this.buildMode = { towerType: type, ghostBody, ghostRange, valid: false };
+    this.buildMode = { kind, ghostBody, ghostRange, valid: false };
     // Tegn build-radius rundt basen
     if (!this.buildRadiusRing) {
       this.buildRadiusRing = this.add.graphics().setDepth(22);
     }
+    const radius = this.buildRadiusFor(kind);
     this.buildRadiusRing.clear();
     this.buildRadiusRing.lineStyle(2, 0xddcc88, 0.55);
-    this.buildRadiusRing.strokeCircle(this.playerBase.x, this.playerBase.y, CONFIG.TOWER_BUILD_RADIUS);
+    this.buildRadiusRing.strokeCircle(this.playerBase.x, this.playerBase.y, radius);
     // Initiel ghost-tegning kommer i pointermove
   }
 
@@ -977,59 +1255,142 @@ export class GameScene extends Phaser.Scene {
 
   private updateBuildGhost(w: Vec2) {
     if (!this.buildMode) return;
-    const spec = CONFIG.TOWER_TYPES[this.buildMode.towerType];
-    const ok = this.canPlaceTower(w.x, w.y) && this.playerGold >= spec.cost;
+    const kind = this.buildMode.kind;
+    const spec = this.getBuildSpec(kind);
+    const ok = this.canPlaceBuildable(kind, w.x, w.y) && this.playerGold >= spec.cost;
     this.buildMode.valid = ok;
     const color = ok ? 0x66dd66 : 0xee5544;
 
-    // Ghost body — kvadrat med diamant-overlegg
+    // Ghost body
     const g = this.buildMode.ghostBody;
     g.clear();
     g.lineStyle(2, color, 0.95);
     g.fillStyle(color, 0.18);
-    g.fillRect(w.x - 18, w.y - 22, 36, 44);
-    g.strokeRect(w.x - 18, w.y - 22, 36, 44);
+    const halfW = spec.w / 2;
+    const halfH = spec.h / 2;
+    g.fillRect(w.x - halfW, w.y - halfH, spec.w, spec.h);
+    g.strokeRect(w.x - halfW, w.y - halfH, spec.w, spec.h);
     g.fillStyle(spec.color, 0.55);
-    g.fillCircle(w.x, w.y - 14, 14);
+    g.fillCircle(w.x, w.y - halfH * 0.3, Math.min(halfW, halfH) * 0.8);
 
-    // Range-ring
+    // Range-ring (kun tower)
     const rg = this.buildMode.ghostRange;
     rg.clear();
-    rg.lineStyle(1.5, color, 0.55);
-    rg.strokeCircle(w.x, w.y, spec.range);
+    if (spec.range > 0) {
+      rg.lineStyle(1.5, color, 0.55);
+      rg.strokeCircle(w.x, w.y, spec.range);
+    }
   }
 
-  /** Plasser tower hvis posisjon er gyldig. Returnerer true ved suksess. */
-  private placeTower(w: Vec2): boolean {
+  /** Plasser buildable hvis posisjon er gyldig. Returnerer true ved suksess.
+   *  Bygningen starter under konstruksjon — workeren walker dit og bygger den ferdig. */
+  private placeBuildable(w: Vec2): boolean {
     if (!this.buildMode) return false;
-    const spec = CONFIG.TOWER_TYPES[this.buildMode.towerType];
-    if (!this.canPlaceTower(w.x, w.y) || this.playerGold < spec.cost) return false;
+    const kind = this.buildMode.kind;
+    const spec = this.getBuildSpec(kind);
+    if (!this.canPlaceBuildable(kind, w.x, w.y) || this.playerGold < spec.cost) return false;
+
+    // Krever en levende player-worker (auto-select skjedde i startBuildMode hvis ingen var valgt)
+    const workers = this.selectedUnits.filter(u => u.faction === 'player' && u.type === 'worker' && !u.dead);
+    if (workers.length === 0) return false;
+
     this.playerGold -= spec.cost;
-    this.createTower(this.buildMode.towerType, w.x, w.y);
+    let b: BuildingData;
+    if (this.isTowerKind(kind)) {
+      b = this.createTower(kind, w.x, w.y);
+    } else if (kind === 'barracks') {
+      b = this.createBuilding('barracks', 'player', w.x, w.y, spec.w, spec.h, spec.hp);
+      this.playerBarracks = b;
+    } else {
+      b = this.createPlaceableBuilding(kind, w.x, w.y);
+    }
+    this.beginConstruction(b, kind);
+
+    // Velg nærmeste worker som bygger; flytt dit
+    let best = workers[0];
+    let bestDist = Phaser.Math.Distance.Between(best.x, best.y, b.x, b.y);
+    for (let i = 1; i < workers.length; i++) {
+      const d = Phaser.Math.Distance.Between(workers[i].x, workers[i].y, b.x, b.y);
+      if (d < bestDist) { best = workers[i]; bestDist = d; }
+    }
+    this.assignWorkerToBuild(best, b);
+
     this.spawnCommandRipple(w.x, w.y, 0xddff88);
     playSfx(this, 'train', { volume: 0.5 });
     return true;
   }
 
+  /** Marker en bygning som under konstruksjon. Setter HP til 25 % av max,
+   *  alpha til 0.55 og lager en progress-bar over bygningen. */
+  private beginConstruction(b: BuildingData, kind: BuildKind) {
+    b.underConstruction = true;
+    b.buildProgress = 0;
+    b.buildTimeMs = this.buildTimeFor(kind);
+    b.hp = Math.max(1, Math.ceil(b.maxHp * 0.25));
+
+    // Visuelt: senk alpha på alle container-/body-elementer
+    const container = b.bridgeContainer ?? b.towerContainer ?? b.buildingContainer;
+    if (container) container.setAlpha(0.55);
+    else b.body.setAlpha(0.55);
+
+    // Progress-bar over bygningen (gjenbruker hp-bar-stil, men i en egen farge)
+    const barY = b.y - Math.max(b.w, b.h) * 0.65 - 14;
+    b.buildProgressBg = this.add.rectangle(b.x, barY, 48, 5, 0x222222).setDepth(9);
+    b.buildProgressFg = this.add.rectangle(b.x - 24, barY, 1, 5, 0xddcc88).setOrigin(0, 0.5).setDepth(10);
+  }
+
+  /** Avslutt konstruksjonen — fjern progress-bar, returner HP og alpha. */
+  private finishConstruction(b: BuildingData) {
+    b.underConstruction = false;
+    b.buildProgress = 1;
+    b.hp = b.maxHp;
+    const container = b.bridgeContainer ?? b.towerContainer ?? b.buildingContainer;
+    if (container) container.setAlpha(1);
+    else b.body.setAlpha(1);
+    b.buildProgressBg?.destroy();
+    b.buildProgressFg?.destroy();
+    b.buildProgressBg = undefined;
+    b.buildProgressFg = undefined;
+    // Liten celebrate-text + N3 build-dust burst
+    this.vfx.floatText(b.x, b.y - 30, 'FERDIG!', '#ddff88');
+    this.vfx.dust(b.x, b.y, 14);
+    playSfx(this, 'train', { volume: 0.6 });
+  }
+
+  /** Send en worker til å bygge en bygning under konstruksjon. */
+  private assignWorkerToBuild(worker: UnitData, site: BuildingData) {
+    worker.mineTarget = null;
+    worker.attackTarget = null;
+    worker.buildTarget = site;
+    worker.state = 'moving';
+    worker.moveTarget = { x: site.x, y: site.y };
+  }
+
   /** Auto-fire fra alle towers — kalt fra update(). */
   private updateTowers(time: number) {
     for (const tower of this.towers) {
-      if (tower.dead || tower.hp <= 0 || !tower.tower) continue;
+      if (tower.dead || tower.hp <= 0 || !tower.tower || tower.underConstruction) continue;
       const t = tower.tower;
       if (time - t.lastFireAt < t.fireRate) continue;
+
+      // K5 — tårn skyter på motsatt fraksjon. Player-tårn → AI-units; AI-tårn → player-units.
+      const enemyFaction: 'player' | 'ai' = tower.faction === 'ai' ? 'player' : 'ai';
 
       // Finn nærmeste fiende-unit innenfor range
       let target: UnitData | null = null;
       let bestDist = t.range;
       for (const u of this.units) {
-        if (u.dead || u.faction !== 'ai') continue;
+        if (u.dead || u.faction !== enemyFaction) continue;
         const d = Phaser.Math.Distance.Between(tower.x, tower.y, u.x, u.y);
         if (d < bestDist) { target = u; bestDist = d; }
       }
       if (!target) continue;
 
       t.lastFireAt = time;
-      this.vfx.fireProjectile(tower.x, tower.y - 14, target.x, target.y, t.type === 'spitter' ? 0x8acc6a : t.type === 'webber' ? 0xc8c8e8 : THEME.ATTACK_PROJECTILE_PLAYER);
+      const projColor = t.type === 'spitter' ? 0x8acc6a
+        : t.type === 'webber' ? 0xc8c8e8
+        : (tower.faction === 'ai' ? THEME.ATTACK_PROJECTILE_AI : THEME.ATTACK_PROJECTILE_PLAYER);
+      this.vfx.fireProjectile(tower.x, tower.y - 14, target.x, target.y, projColor);
       this.vfx.impact(target.x, target.y);
       playSfx(this, 'attack', { volume: 0.15 });
 
@@ -1039,12 +1400,54 @@ export class GameScene extends Phaser.Scene {
       // Splash (spitter)
       if (t.splash > 0) {
         for (const u of this.units) {
-          if (u === target || u.dead || u.faction !== 'ai') continue;
+          if (u === target || u.dead || u.faction !== enemyFaction) continue;
           const d = Phaser.Math.Distance.Between(target.x, target.y, u.x, u.y);
           if (d <= t.splash) this.applyTowerHit(u, Math.round(t.damage * 0.6), t.slow, time);
         }
       }
     }
+  }
+
+  /** M3.2 — Base auto-attack når Forsvar er kjøpt. */
+  private updateBaseDefense(time: number) {
+    const base = this.playerBase;
+    if (!base || base.dead || base.hp <= 0 || !base.defense) return;
+    const d = base.defense;
+    if (time - d.lastFireAt < d.fireRate) return;
+
+    let target: UnitData | null = null;
+    let bestDist = d.range;
+    for (const u of this.units) {
+      if (u.dead || u.faction !== 'ai') continue;
+      const dist = Phaser.Math.Distance.Between(base.x, base.y, u.x, u.y);
+      if (dist < bestDist) { target = u; bestDist = dist; }
+    }
+    if (!target) return;
+
+    d.lastFireAt = time;
+    this.vfx.fireProjectile(base.x, base.y - 8, target.x, target.y, THEME.ATTACK_PROJECTILE_PLAYER);
+    this.vfx.impact(target.x, target.y);
+    playSfx(this, 'attack', { volume: 0.18 });
+    this.applyTowerHit(target, d.damage, 0, time);
+  }
+
+  /** M3.2 — kjøp "Forsvar"-oppgradering på player-base. */
+  private upgradeBaseDefense() {
+    const base = this.playerBase;
+    if (!base || base.dead || base.hp <= 0) return;
+    if (base.defense) return; // allerede kjøpt
+    if (this.playerGold < CONFIG.BASE_DEFENSE_COST) return;
+    this.playerGold -= CONFIG.BASE_DEFENSE_COST;
+    base.maxHp += CONFIG.BASE_DEFENSE_HP_BONUS;
+    base.hp += CONFIG.BASE_DEFENSE_HP_BONUS;
+    base.defense = {
+      range: CONFIG.BASE_DEFENSE_RANGE,
+      damage: CONFIG.BASE_DEFENSE_DAMAGE,
+      fireRate: CONFIG.BASE_DEFENSE_FIRE_RATE,
+      lastFireAt: 0,
+    };
+    this.vfx.floatText(base.x, base.y - 60, 'FORSVAR!', '#ddff88');
+    playSfx(this, 'train', { volume: 0.75 });
   }
 
   private applyTowerHit(target: UnitData, damage: number, slow: number, time: number) {
@@ -1159,15 +1562,17 @@ export class GameScene extends Phaser.Scene {
     antBody.add([legs, abdomen, thorax, head, headSheen, appendages]);
 
     // HP-bar og selection-ring lever på ytre container (roteres ikke)
-    const hpBg = this.add.rectangle(0, -r - 6, r * 2, 4, 0x111111).setStrokeStyle(1, 0x000000, 0.5);
-    const hpFg = this.add.rectangle(-r, -r - 6, r * 2, 4, 0x44ee44).setOrigin(0, 0.5);
-    const selRing = this.add.arc(0, 0, r + 5, 0, 360, false, 0xffffff, 0)
-      .setStrokeStyle(2, 0xffffff, 1).setVisible(false);
+    const hpBg = this.add.rectangle(0, -r - 7, r * 2 + 2, 6, 0x2a1810).setStrokeStyle(1, 0x000000, 0.95);
+    const hpFg = this.add.rectangle(-r, -r - 7, r * 2, 4, 0x8cd95a).setOrigin(0, 0.5);
+    const selGlow = this.add.arc(0, 0, r + 6, 0, 360, false, 0xff9d4a, 0)
+      .setStrokeStyle(8, 0xff9d4a, 0.22).setVisible(false);
+    const selRing = this.add.arc(0, 0, r + 6, 0, 360, false, 0xff9d4a, 0)
+      .setStrokeStyle(3, 0xff9d4a, 0.95).setVisible(false);
 
     hpBg.setVisible(false);
     hpFg.setVisible(false);
 
-    const container = this.add.container(x, y, [footprint, shadow, antBody, hpBg, hpFg, selRing]).setDepth(5);
+    const container = this.add.container(x, y, [footprint, shadow, antBody, selGlow, hpBg, hpFg, selRing]).setDepth(5);
 
     const unit: UnitData = {
       id: this.nextId++, faction, type, x, y,
@@ -1178,10 +1583,10 @@ export class GameScene extends Phaser.Scene {
       attackRange: isSoldier ? CONFIG.SOLDIER_ATTACK_RANGE : 0,
       attackInterval: CONFIG.SOLDIER_ATTACK_SPEED,
       lastAttackAt: 0,
-      state: 'idle', moveTarget: null, attackTarget: null, mineTarget: null,
+      state: 'idle', moveTarget: null, attackTarget: null, mineTarget: null, buildTarget: null,
       selected: false, dead: false,
       container, antBody, body: thorax, segments: [abdomen, thorax, head],
-      bodyColor, hpBg, hpFg, selectionRing: selRing,
+      bodyColor, hpBg, hpFg, selectionRing: selRing, selectionGlow: selGlow,
       selectionTween: null, radius: r,
       lastDx: isPlayer ? 1 : -1, lastDy: 0,
       slowedUntil: 0,
@@ -1193,6 +1598,9 @@ export class GameScene extends Phaser.Scene {
 
   private removeUnit(unit: UnitData) {
     unit.dead = true;
+    // V7 — tell tapte/drepte enheter (player POV) for game-over stats.
+    if (unit.faction === 'player') this.statsUnitsLost++;
+    else if (unit.faction === 'ai') this.statsEnemyKills++;
     // Remove from logical lists BEFORE the tween so update/find don't touch a dying unit
     this.units = this.units.filter(u => u !== unit);
     this.selectedUnits = this.selectedUnits.filter(u => u !== unit);
@@ -1236,6 +1644,8 @@ export class GameScene extends Phaser.Scene {
 
     // M2.1 — towers fyrer på fiende-units
     this.updateTowers(time);
+    // M3.2 — base auto-attack (kun hvis Forsvar er kjøpt)
+    this.updateBaseDefense(time);
 
     // M2.2 — wave-modus oppdaterer spawns og sjekker seier
     if (CONFIG.WAVE_MODE.enabled) {
@@ -1277,6 +1687,7 @@ export class GameScene extends Phaser.Scene {
   private updateUnit(unit: UnitData, time: number, dt: number) {
     unit.container.setPosition(unit.x, unit.y);
     unit.selectionRing.setVisible(unit.selected);
+    unit.selectionGlow.setVisible(unit.selected);
 
     // Idle-bob (bobber hele ant-body, ikke HP-bar/selection)
     const bob = Math.sin((time + unit.id * 137) * 0.004) * 1.0;
@@ -1322,11 +1733,25 @@ export class GameScene extends Phaser.Scene {
           const arrived = this.moveToward(unit, unit.moveTarget, dt);
           if (arrived) {
             unit.moveTarget = null;
-            unit.state = unit.mineTarget ? 'mining' : 'idle';
+            // Worker som har et byggemål: flip til 'building' når vi har kommet fram
+            if (unit.buildTarget && !unit.buildTarget.dead && unit.buildTarget.hp > 0
+                && unit.buildTarget.underConstruction) {
+              unit.state = 'building';
+            } else if (unit.buildTarget) {
+              // Byggesite er dødt eller ferdig — slipp og gå idle
+              unit.buildTarget = null;
+              unit.state = 'idle';
+            } else {
+              unit.state = unit.mineTarget ? 'mining' : 'idle';
+            }
           }
         } else {
           unit.state = 'idle';
         }
+        break;
+
+      case 'building':
+        this.updateBuildingUnit(unit, dt);
         break;
 
       case 'idle':
@@ -1336,6 +1761,41 @@ export class GameScene extends Phaser.Scene {
 
     // Light separation push
     this.separate(unit);
+  }
+
+  /** Worker konstruerer en bygning. Inkrementerer buildProgress, HP lerper opp,
+   *  og workeren frigis når progress når 1. Hvis sitet dør eller forsvinner,
+   *  flipper workeren til idle. */
+  private updateBuildingUnit(unit: UnitData, dt: number) {
+    const site = unit.buildTarget;
+    if (!site || site.dead || site.hp <= 0 || !site.underConstruction) {
+      unit.buildTarget = null;
+      unit.state = 'idle';
+      return;
+    }
+    // Hold workeren ved sitet (innen ~30px)
+    const d = Phaser.Math.Distance.Between(unit.x, unit.y, site.x, site.y);
+    if (d > 30) {
+      unit.state = 'moving';
+      unit.moveTarget = { x: site.x, y: site.y };
+      return;
+    }
+    const tm = site.buildTimeMs ?? 5000;
+    site.buildProgress = (site.buildProgress ?? 0) + (dt * 1000) / tm;
+    // HP lerper fra 25 % → 100 % under konstruksjon
+    const targetHp = site.maxHp * (0.25 + 0.75 * Math.min(1, site.buildProgress));
+    site.hp = Math.min(site.maxHp, Math.max(site.hp, targetHp));
+
+    // Oppdater progress-bar
+    if (site.buildProgressFg) {
+      site.buildProgressFg.setDisplaySize(48 * Math.min(1, site.buildProgress), 5);
+    }
+
+    if (site.buildProgress >= 1) {
+      this.finishConstruction(site);
+      unit.buildTarget = null;
+      unit.state = 'idle';
+    }
   }
 
   private updateAttacking(unit: UnitData, time: number, dt: number) {
@@ -1359,6 +1819,14 @@ export class GameScene extends Phaser.Scene {
       this.vfx.impact(target.x, target.y);
       // M1.4 — attack-hit sfx (lavt volum så det ikke blir spammet av store kamper)
       playSfx(this, 'attack', { volume: 0.18 });
+
+      // Broer (invulnerable) tar aldri skade. Forsvarsmekanisme hvis en target slipper
+      // gjennom andre filtere — pluss avbryt angrepet så enheten finner nytt mål.
+      if (!isUnit(target) && target.invulnerable) {
+        unit.attackTarget = null;
+        unit.state = 'idle';
+        return;
+      }
 
       target.hp -= unit.damage;
 
@@ -1403,6 +1871,20 @@ export class GameScene extends Phaser.Scene {
     b.hpFg.setVisible(false);
     b.hpBg.setVisible(false);
     b.label?.setVisible(false);
+    b.buildProgressBg?.destroy();
+    b.buildProgressFg?.destroy();
+    b.buildProgressBg = undefined;
+    b.buildProgressFg = undefined;
+    // Nullstill barakke-refs så build-order kan bygge nye
+    if (this.playerBarracks === b) this.playerBarracks = null;
+    if (this.aiBarracks === b) this.aiBarracks = null;
+    // Hvis det er en byggeplass: fri workere som bygde på den
+    for (const u of this.units) {
+      if (u.buildTarget === b) {
+        u.buildTarget = null;
+        if (u.state === 'building') u.state = 'idle';
+      }
+    }
     this.cameras.main.shake(220, 0.005);
     this.vfx.dust(b.x, b.y, 14);
     // Broer kollapser containeren (planker faller), basers body fader.
@@ -1410,6 +1892,7 @@ export class GameScene extends Phaser.Scene {
     const target: Phaser.GameObjects.GameObject =
       b.kind === 'bridge' && b.bridgeContainer ? b.bridgeContainer
       : b.kind === 'tower' && b.towerContainer ? b.towerContainer
+      : b.buildingContainer ? b.buildingContainer
       : b.body;
     this.tweens.add({
       targets: target,
@@ -1470,35 +1953,23 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Terreng-status ved (x,y) for bevegelseslogikk:
-   *  - 'land'             : normal bevegelse
+   *  - 'land'              : normal bevegelse
    *  - 'bridge'            : inne i elv, men på en levende bro → normal bevegelse
-   *  - 'swim'              : inne i elv, ingen levende bro i denne elven → tillatt, men sakte
-   *  - 'blocked'           : inne i elv, broer lever men ikke nær nok → blokker
+   *  - 'blocked'           : inne i elv, ikke nær en bro → maur kan ikke svømme
    *
-   * Rektangulær pass-zone rundt broa (matcher faktisk bro-størrelse + liten margin).
+   * Sjekker om punktet er innenfor bro-fotavtrykket (bredde × høyde + margin).
    */
-  private riverStateAt(x: number, y: number): 'land' | 'bridge' | 'swim' | 'blocked' {
+  private riverStateAt(x: number, y: number): 'land' | 'bridge' | 'blocked' {
     for (const r of this.rivers) {
       if (!pointInPolygon({ x, y }, r.polygon)) continue;
-      // Broen krysser elven på sin LANGE akse. For vertikal elv (høyere enn bredt
-      // polygon) er det x-aksen. Det betyr: så lenge unit er innenfor bro.x ± w/2
-      // er den på broa, uansett y-posisjon innenfor elv-stripen. Det hindrer at
-      // separasjon eller drift dytter units av broa midt i kryssingen.
-      const polyW = r.polygon[1].x - r.polygon[0].x;
-      const polyH = r.polygon[2].y - r.polygon[1].y;
-      const verticalRiver = polyH > polyW;
       const margin = 12;
       for (const b of r.bridges) {
         if (b.dead || b.hp <= 0) continue;
-        if (verticalRiver) {
-          if (Math.abs(x - b.x) < b.w / 2 + margin) return 'bridge';
-        } else {
-          if (Math.abs(y - b.y) < b.h / 2 + margin) return 'bridge';
+        if (Math.abs(x - b.x) < b.w / 2 + margin && Math.abs(y - b.y) < b.h / 2 + margin) {
+          return 'bridge';
         }
       }
-      // Ingen pass-zone funnet — er det noen levende bro overhodet?
-      const anyLive = r.bridges.some(b => !b.dead && b.hp > 0);
-      return anyLive ? 'blocked' : 'swim';
+      return 'blocked';
     }
     return 'land';
   }
@@ -1506,6 +1977,332 @@ export class GameScene extends Phaser.Scene {
   /** Bakoverkompatibel: brukes av separat-logikk som bare vil vite om vi skal unngå. */
   private isBlockedByRiver(x: number, y: number): boolean {
     return this.riverStateAt(x, y) === 'blocked';
+  }
+
+  /**
+   * True hvis (x,y) er på en cliff-kant (innenfor CLIFF_THICKNESS av platåets perimeter)
+   * OG ikke i en rampe. Cliff blokkerer bevegelse — ramper er passable åpninger.
+   */
+  /** True hvis (x,y) er innenfor platåets footprint (high-ground). Brukt av
+   *  auto-mine-assign for å unngå at workers ramler inn på et platå og blir
+   *  fanget av cliffs når de senere må krysse tilbake til lavlandet for å bygge. */
+  private isPointOnPlateau(x: number, y: number): boolean {
+    for (const p of this.plateaus) {
+      if (x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h) return true;
+    }
+    return false;
+  }
+
+  private isBlockedByCliff(x: number, y: number): boolean {
+    if (this.plateaus.length === 0) return false;
+    const t = GameScene.CLIFF_THICKNESS;
+    for (const p of this.plateaus) {
+      if (x < p.x - t || x > p.x + p.w + t || y < p.y - t || y > p.y + p.h + t) continue;
+      const onTop = Math.abs(y - p.y) <= t && x >= p.x - t && x <= p.x + p.w + t;
+      const onBottom = Math.abs(y - (p.y + p.h)) <= t && x >= p.x - t && x <= p.x + p.w + t;
+      const onLeft = Math.abs(x - p.x) <= t && y >= p.y - t && y <= p.y + p.h + t;
+      const onRight = Math.abs(x - (p.x + p.w)) <= t && y >= p.y - t && y <= p.y + p.h + t;
+      if (!onTop && !onBottom && !onLeft && !onRight) continue;
+      const inRamp = p.ramps.some(r => {
+        if (r.side === 'top' && onTop) return x >= r.from && x <= r.to;
+        if (r.side === 'bottom' && onBottom) return x >= r.from && x <= r.to;
+        if (r.side === 'left' && onLeft) return y >= r.from && y <= r.to;
+        if (r.side === 'right' && onRight) return y >= r.from && y <= r.to;
+        return false;
+      });
+      if (!inRamp) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Tegner platåene som lysere areal med drop-shadow på utsiden av cliffs,
+   * mørke kant-linjer langs cliff-perimeter, og diagonale stripe-stier i ramper.
+   */
+  private renderPlateaus() {
+    const t = GameScene.CLIFF_THICKNESS;
+    const shadow = this.add.graphics().setDepth(0);
+    for (const p of this.plateaus) {
+      shadow.fillStyle(0x000000, 0.30);
+      shadow.fillRoundedRect(p.x - t - 8, p.y - t - 6, p.w + (t + 8) * 2, p.h + (t + 6) * 2, 14);
+    }
+
+    const topG = this.add.graphics().setDepth(0);
+    for (const p of this.plateaus) {
+      topG.fillStyle(0x5e8848, 1);
+      topG.fillRect(p.x, p.y, p.w, p.h);
+      topG.fillStyle(0x6ba055, 0.5);
+      topG.fillRect(p.x + 2, p.y + 2, p.w - 4, p.h * 0.5);
+    }
+
+    const edge = this.add.graphics().setDepth(1);
+    for (const p of this.plateaus) {
+      this.drawCliffEdge(edge, p, 'top');
+      this.drawCliffEdge(edge, p, 'bottom');
+      this.drawCliffEdge(edge, p, 'left');
+      this.drawCliffEdge(edge, p, 'right');
+    }
+
+    const rampGfx = this.add.graphics().setDepth(1);
+    for (const p of this.plateaus) {
+      for (const r of p.ramps) {
+        this.drawRamp(rampGfx, p, r);
+      }
+    }
+
+    const grassTop = this.add.graphics().setDepth(1);
+    for (const p of this.plateaus) {
+      for (let i = 0; i < 90; i++) {
+        const bx = Phaser.Math.Between(p.x + t + 4, p.x + p.w - t - 4);
+        const by = Phaser.Math.Between(p.y + t + 4, p.y + p.h - t - 4);
+        const len = Phaser.Math.Between(3, 8);
+        const tilt = Phaser.Math.FloatBetween(-1.5, 1.5);
+        grassTop.lineStyle(1, THEME.GRASS_BLADE_COLOR, Phaser.Math.FloatBetween(0.4, 0.8));
+        grassTop.lineBetween(bx, by, bx + tilt, by - len);
+      }
+    }
+  }
+
+  private drawCliffEdge(g: Phaser.GameObjects.Graphics, p: Plateau, side: Ramp['side']) {
+    let axisStart: number, axisEnd: number, fixed: number;
+    if (side === 'top') { axisStart = p.x; axisEnd = p.x + p.w; fixed = p.y; }
+    else if (side === 'bottom') { axisStart = p.x; axisEnd = p.x + p.w; fixed = p.y + p.h; }
+    else if (side === 'left') { axisStart = p.y; axisEnd = p.y + p.h; fixed = p.x; }
+    else { axisStart = p.y; axisEnd = p.y + p.h; fixed = p.x + p.w; }
+
+    const gaps = p.ramps
+      .filter(r => r.side === side)
+      .map(r => ({ from: Math.max(r.from, axisStart), to: Math.min(r.to, axisEnd) }))
+      .sort((a, b) => a.from - b.from);
+
+    let cursor = axisStart;
+    for (const gap of gaps) {
+      if (gap.from > cursor) this.strokeCliffSegment(g, side, cursor, gap.from, fixed);
+      cursor = Math.max(cursor, gap.to);
+    }
+    if (cursor < axisEnd) this.strokeCliffSegment(g, side, cursor, axisEnd, fixed);
+  }
+
+  private strokeCliffSegment(g: Phaser.GameObjects.Graphics, side: Ramp['side'],
+                              start: number, end: number, fixed: number) {
+    const t = GameScene.CLIFF_THICKNESS;
+    const DARK = 0x2a3a1a;
+    const MID = 0x3a4a28;
+    if (side === 'top' || side === 'bottom') {
+      const yOuter = side === 'top' ? fixed - t : fixed;
+      g.fillStyle(MID, 0.85);
+      g.fillRect(start, yOuter, end - start, t);
+      g.lineStyle(2.5, DARK, 0.95);
+      g.lineBetween(start, fixed, end, fixed);
+      g.lineStyle(1, 0x000000, 0.35);
+      g.lineBetween(start, side === 'top' ? fixed - t : fixed + t, end, side === 'top' ? fixed - t : fixed + t);
+    } else {
+      const xOuter = side === 'left' ? fixed - t : fixed;
+      g.fillStyle(MID, 0.85);
+      g.fillRect(xOuter, start, t, end - start);
+      g.lineStyle(2.5, DARK, 0.95);
+      g.lineBetween(fixed, start, fixed, end);
+      g.lineStyle(1, 0x000000, 0.35);
+      g.lineBetween(side === 'left' ? fixed - t : fixed + t, start, side === 'left' ? fixed - t : fixed + t, end);
+    }
+  }
+
+  private drawRamp(g: Phaser.GameObjects.Graphics, p: Plateau, r: Ramp) {
+    const t = GameScene.CLIFF_THICKNESS;
+    let rx = 0, ry = 0, rw = 0, rh = 0;
+    if (r.side === 'top')    { rx = r.from; ry = p.y - t; rw = r.to - r.from; rh = t * 2; }
+    if (r.side === 'bottom') { rx = r.from; ry = p.y + p.h - t; rw = r.to - r.from; rh = t * 2; }
+    if (r.side === 'left')   { rx = p.x - t; ry = r.from; rw = t * 2; rh = r.to - r.from; }
+    if (r.side === 'right')  { rx = p.x + p.w - t; ry = r.from; rw = t * 2; rh = r.to - r.from; }
+
+    g.fillStyle(0x5e8842, 0.92);
+    g.fillRect(rx, ry, rw, rh);
+
+    const stripeSpacing = 6;
+    g.lineStyle(1.5, 0x3a4a28, 0.5);
+    const isHorizontal = r.side === 'left' || r.side === 'right';
+    if (isHorizontal) {
+      for (let yy = ry - rh; yy < ry + rh * 2; yy += stripeSpacing) {
+        g.lineBetween(rx, yy, rx + rw, yy + rh);
+      }
+    } else {
+      for (let xx = rx - rw; xx < rx + rw * 2; xx += stripeSpacing) {
+        g.lineBetween(xx, ry, xx + rw, ry + rh);
+      }
+    }
+
+    g.lineStyle(2, 0x2a3a1a, 0.85);
+    if (isHorizontal) {
+      g.lineBetween(rx, ry, rx + rw, ry);
+      g.lineBetween(rx, ry + rh, rx + rw, ry + rh);
+    } else {
+      g.lineBetween(rx, ry, rx, ry + rh);
+      g.lineBetween(rx + rw, ry, rx + rw, ry + rh);
+    }
+  }
+
+  /** Impassabel steinformasjon — sirkulær blokk-radius. */
+  private isBlockedByObstacle(x: number, y: number): boolean {
+    if (this.obstacles.length === 0) return false;
+    for (const o of this.obstacles) {
+      const dx = x - o.x;
+      const dy = y - o.y;
+      if (dx * dx + dy * dy < o.radius * o.radius) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Steinformasjon — flere overlappende steiner som tegnes som en organisk klump.
+   * Blokkerer bevegelse innenfor en sirkulær radius. Plasseres som faste hindere på kartet.
+   */
+  private createObstacle(x: number, y: number, radius: number) {
+    this.obstacles.push({ x, y, radius });
+
+    // Mørk skygge på bakken
+    const shadowGfx = this.add.graphics().setDepth(0);
+    shadowGfx.fillStyle(0x000000, 0.35);
+    shadowGfx.fillEllipse(x + 2, y + radius * 0.4, radius * 2.2, radius * 0.9);
+
+    // Stein-kropper — 3-5 overlappende ellipser i ulik grå/brun
+    const stoneColors = [0x7a7066, 0x6a6056, 0x8a7e72, 0x5a5048, 0x968c80];
+    const count = Phaser.Math.Between(3, 5);
+    const seed = Math.random() * 1000;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + seed * 0.01;
+      const off = radius * 0.45;
+      const sx = x + Math.cos(angle) * off;
+      const sy = y + Math.sin(angle) * off * 0.7;
+      const sw = radius * Phaser.Math.FloatBetween(0.95, 1.4);
+      const sh = radius * Phaser.Math.FloatBetween(0.7, 1.0);
+      const col = stoneColors[(i + Math.floor(seed)) % stoneColors.length];
+      // Underside-skygge
+      this.add.ellipse(sx, sy + 2, sw, sh, 0x2a2620, 0.55).setDepth(1);
+      // Stein
+      this.add.ellipse(sx, sy, sw, sh, col).setDepth(2);
+      // Highlight på toppen
+      this.add.ellipse(sx - sw * 0.18, sy - sh * 0.25, sw * 0.5, sh * 0.35, 0xffffff, 0.18).setDepth(3);
+    }
+
+    // Sentral, høyere stein på toppen
+    this.add.ellipse(x, y - radius * 0.15, radius * 1.5, radius * 1.1, stoneColors[0]).setDepth(3);
+    this.add.ellipse(x - radius * 0.2, y - radius * 0.4, radius * 0.6, radius * 0.4, 0xffffff, 0.22).setDepth(4);
+
+    // Litt mose-grønn på sidene
+    if (Math.random() < 0.7) {
+      const mossAngle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      this.add.ellipse(
+        x + Math.cos(mossAngle) * radius * 0.7,
+        y + Math.sin(mossAngle) * radius * 0.5,
+        radius * 0.6, radius * 0.3, 0x3a5a28, 0.6,
+      ).setDepth(4);
+    }
+
+    // Små steinflis rundt foten — bryter opp silhuett
+    for (let i = 0; i < 4; i++) {
+      const a = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      const d = radius * Phaser.Math.FloatBetween(0.9, 1.15);
+      const cx = x + Math.cos(a) * d;
+      const cy = y + Math.sin(a) * d * 0.55;
+      const cc = THEME.PEBBLE_COLORS[i % THEME.PEBBLE_COLORS.length];
+      this.add.ellipse(cx + 0.5, cy + 0.8, 5, 3, 0x000000, 0.4).setDepth(0);
+      this.add.ellipse(cx, cy, 5, 3, cc).setDepth(1);
+    }
+  }
+
+  /**
+   * Dekorative jord-/mose-flekker spredt over hele kartet for visuell variasjon.
+   * Påvirker ikke gameplay — bare bryter opp den ensformige grasspekkete bakken.
+   */
+  private paintGroundPatches(W: number, H: number) {
+    const dirtGfx = this.add.graphics().setDepth(0);
+    const RIVER_X = 1280;
+    const RIVER_HALF = 60;
+
+    // 14 store jord-flekker — mørke ovale shaper
+    for (let i = 0; i < 14; i++) {
+      let px = 0, py = 0, ok = false;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        px = Phaser.Math.Between(80, W - 80);
+        py = Phaser.Math.Between(80, H - 80);
+        if (Math.abs(px - RIVER_X) < RIVER_HALF + 30) continue; // unngå elv
+        if (this.isBlockedByObstacle(px, py)) continue;
+        ok = true;
+        break;
+      }
+      if (!ok) continue;
+      const w = Phaser.Math.Between(90, 180);
+      const h = Phaser.Math.Between(50, 120);
+      const a = Phaser.Math.FloatBetween(0.18, 0.32);
+      dirtGfx.fillStyle(0x4a3a22, a);
+      dirtGfx.fillEllipse(px, py, w, h);
+      // En lysere kant inni for tekstur-følelse
+      dirtGfx.fillStyle(0x5a4828, a * 0.6);
+      dirtGfx.fillEllipse(px - w * 0.1, py - h * 0.15, w * 0.6, h * 0.55);
+    }
+
+    // 10 mose-flekker — mørkegrønne
+    for (let i = 0; i < 10; i++) {
+      let px = 0, py = 0, ok = false;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        px = Phaser.Math.Between(80, W - 80);
+        py = Phaser.Math.Between(80, H - 80);
+        if (Math.abs(px - RIVER_X) < RIVER_HALF + 30) continue;
+        if (this.isBlockedByObstacle(px, py)) continue;
+        ok = true;
+        break;
+      }
+      if (!ok) continue;
+      const w = Phaser.Math.Between(60, 120);
+      const h = Phaser.Math.Between(40, 80);
+      dirtGfx.fillStyle(0x3a5a28, Phaser.Math.FloatBetween(0.22, 0.36));
+      dirtGfx.fillEllipse(px, py, w, h);
+      dirtGfx.fillStyle(0x4a7a38, Phaser.Math.FloatBetween(0.18, 0.28));
+      dirtGfx.fillEllipse(px + 2, py - 2, w * 0.55, h * 0.5);
+    }
+
+    // 30 ekstra større kvist/pinne-streker (litt for å bryte ensformighet)
+    const twigs = this.add.graphics().setDepth(0);
+    for (let i = 0; i < 30; i++) {
+      let tx = 0, ty = 0, ok = false;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        tx = Phaser.Math.Between(60, W - 60);
+        ty = Phaser.Math.Between(60, H - 60);
+        if (Math.abs(tx - RIVER_X) < RIVER_HALF + 18) continue;
+        if (this.isBlockedByObstacle(tx, ty)) continue;
+        ok = true;
+        break;
+      }
+      if (!ok) continue;
+      const len = Phaser.Math.Between(12, 26);
+      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      const dx = Math.cos(angle) * len;
+      const dy = Math.sin(angle) * len;
+      twigs.lineStyle(2, THEME.TWIG_COLOR, 0.65);
+      twigs.lineBetween(tx, ty, tx + dx, ty + dy);
+      // Liten sidegren
+      if (Math.random() < 0.5) {
+        const sx = tx + dx * 0.55;
+        const sy = ty + dy * 0.55;
+        const sa = angle + Phaser.Math.FloatBetween(0.5, 1.2) * (Math.random() < 0.5 ? -1 : 1);
+        twigs.lineBetween(sx, sy, sx + Math.cos(sa) * 6, sy + Math.sin(sa) * 6);
+      }
+    }
+  }
+
+  /** M3.1 — er (x,y) inne i en levende wall (med blokk-radius)? */
+  private isBlockedByWall(x: number, y: number): boolean {
+    if (this.walls.length === 0) return false;
+    const r = CONFIG.WALL_BLOCK_RADIUS;
+    for (const w of this.walls) {
+      if (w.dead || w.hp <= 0 || w.underConstruction) continue;
+      // Rektangulær avstand: utvidet bbox med r
+      if (x > w.x - w.w / 2 - r && x < w.x + w.w / 2 + r &&
+          y > w.y - w.h / 2 - r && y < w.y + w.h / 2 + r) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private moveToward(unit: UnitData, target: Vec2, dt: number): boolean {
@@ -1532,19 +2329,60 @@ export class GameScene extends Phaser.Scene {
     const newState = this.riverStateAt(newX, newY);
     const oldState = this.riverStateAt(unit.x, unit.y);
 
-    if (newState === 'blocked' && oldState !== 'blocked' && oldState !== 'swim') {
-      // Levende bro finnes men vi treffer ikke pass-zonen → la routing finne broa neste frame.
+    if (newState === 'blocked' && oldState !== 'blocked') {
+      // Maur kan ikke svømme. La routing finne broa neste frame.
       return false;
     }
-    if (newState === 'swim') {
-      // Ingen bro krysser denne elven — vading tillatt med 30% fart.
-      step *= 0.3;
-      newX = unit.x + nx * step;
-      newY = unit.y + ny * step;
+    // V6 — Multi-angle slide. Hvis full bevegelse er blokkert, prøv vinkler ±30°, ±60°, ±90°.
+    // Mye bedre enn ren akse-slide for å komme rundt obstacles og enheter.
+    if (this.isBlockedByObstacle(newX, newY)) {
+      const found = this.findSlideAngle(unit, nx, ny, step, (x, y) => this.isBlockedByObstacle(x, y));
+      if (found) { newX = found.x; newY = found.y; }
+      else return false;
+    }
+    // M3.6 — cliffs (platå-kanter) blokkerer bevegelse; ramper er passable åpninger.
+    if (this.isBlockedByCliff(newX, newY)) {
+      const found = this.findSlideAngle(unit, nx, ny, step, (x, y) => this.isBlockedByCliff(x, y));
+      if (found) { newX = found.x; newY = found.y; }
+      else return false;
+    }
+    // M3.1 — Walls blokkerer bevegelse. V6 — multi-angle slide.
+    if (this.isBlockedByWall(newX, newY)) {
+      const found = this.findSlideAngle(unit, nx, ny, step, (x, y) => this.isBlockedByWall(x, y));
+      if (found) { newX = found.x; newY = found.y; }
+      else return false;
     }
     unit.x = newX;
     unit.y = newY;
     return false;
+  }
+
+  /**
+   * V6 — Multi-angle slide. Prøver perturberte bevegelses-vinkler (±30°, ±60°, ±90°)
+   * for å komme rundt en blokade. Returnerer første gyldige (x,y), eller null.
+   *
+   * Mye bedre enn aksial slide for organiske obstacles: enhet glir rundt en sten
+   * istedenfor å klikse mot den.
+   */
+  private findSlideAngle(
+    unit: UnitData,
+    nx: number,
+    ny: number,
+    step: number,
+    isBlocked: (x: number, y: number) => boolean,
+  ): Vec2 | null {
+    // Vinkler i radianer: 30°, -30°, 60°, -60°, 90°, -90° (omtrent)
+    const angles = [Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3, Math.PI / 2, -Math.PI / 2];
+    for (const a of angles) {
+      const cosA = Math.cos(a);
+      const sinA = Math.sin(a);
+      const rotX = nx * cosA - ny * sinA;
+      const rotY = nx * sinA + ny * cosA;
+      const tryX = unit.x + rotX * step;
+      const tryY = unit.y + rotY * step;
+      if (!isBlocked(tryX, tryY)) return { x: tryX, y: tryY };
+    }
+    return null;
   }
 
   private separate(unit: UnitData) {
@@ -1558,8 +2396,10 @@ export class GameScene extends Phaser.Scene {
         const push = ((minDist - dist) / minDist) * 0.4;
         const newX = unit.x + (dx / dist) * push;
         const newY = unit.y + (dy / dist) * push;
-        // Ikke push enheten inn i elv — la den heller forbli klemt
-        if (!this.isBlockedByRiver(newX, newY) || this.isBlockedByRiver(unit.x, unit.y)) {
+        // Ikke push enheten inn i elv eller stein — la den heller forbli klemt
+        const intoBlocker = this.isBlockedByRiver(newX, newY) || this.isBlockedByObstacle(newX, newY) || this.isBlockedByCliff(newX, newY);
+        const alreadyInBlocker = this.isBlockedByRiver(unit.x, unit.y) || this.isBlockedByObstacle(unit.x, unit.y) || this.isBlockedByCliff(unit.x, unit.y);
+        if (!intoBlocker || alreadyInBlocker) {
           unit.x = newX;
           unit.y = newY;
         }
@@ -1618,7 +2458,7 @@ export class GameScene extends Phaser.Scene {
       if (pointer.rightButtonDown()) {
         this.cancelBuildMode();
       } else {
-        const placed = this.placeTower(this.wp(pointer));
+        const placed = this.placeBuildable(this.wp(pointer));
         // Shift = behold build-mode for å plassere flere; ellers exit
         if (placed && !pointer.event.shiftKey) this.cancelBuildMode();
       }
@@ -1663,21 +2503,25 @@ export class GameScene extends Phaser.Scene {
     this.hoverGfx.clear();
     const w = this.wp(pointer);
 
-    // Egen enhet → hvit ring (select-hint)
+    // Egen enhet → varm-gul ring (select-hint) med glow
     const own = this.hitUnitAt(w, 'player');
     if (own) {
-      this.hoverGfx.lineStyle(2, 0xffffff, 0.9);
-      this.hoverGfx.strokeCircle(own.x, own.y, own.radius + 4);
+      this.hoverGfx.lineStyle(7, 0xffd76a, 0.2);
+      this.hoverGfx.strokeCircle(own.x, own.y, own.radius + 5);
+      this.hoverGfx.lineStyle(3, 0xffeaa0, 0.95);
+      this.hoverGfx.strokeCircle(own.x, own.y, own.radius + 5);
       this.input.setDefaultCursor('pointer');
       return;
     }
 
-    // Fiende-enhet → rød ring (attack-hint, krever utvalg)
+    // Fiende-enhet → rød ring (attack-hint, krever utvalg) med glow
     const foe = this.hitUnitAt(w, 'ai');
     if (foe) {
       const color = this.selectedUnits.some(u => u.type === 'soldier') ? 0xff5544 : 0xaa6655;
-      this.hoverGfx.lineStyle(2, color, 0.9);
-      this.hoverGfx.strokeCircle(foe.x, foe.y, foe.radius + 4);
+      this.hoverGfx.lineStyle(7, color, 0.2);
+      this.hoverGfx.strokeCircle(foe.x, foe.y, foe.radius + 5);
+      this.hoverGfx.lineStyle(3, color, 0.95);
+      this.hoverGfx.strokeCircle(foe.x, foe.y, foe.radius + 5);
       this.input.setDefaultCursor('crosshair');
       return;
     }
@@ -1685,14 +2529,17 @@ export class GameScene extends Phaser.Scene {
     // Bygninger / mine
     type CursorHint = 'pointer' | 'default';
     const buildings: { b: BuildingData; tint: number; cur: CursorHint }[] = [
-      { b: this.playerBarracks, tint: 0x88c0ff, cur: 'pointer' },
+      { b: this.playerBase, tint: 0x88c0ff, cur: 'pointer' },
       { b: this.aiBase, tint: 0xff5544, cur: 'pointer' },
-      { b: this.aiBarracks, tint: 0xff5544, cur: 'pointer' },
     ];
+    if (this.playerBarracks) buildings.push({ b: this.playerBarracks, tint: 0x88c0ff, cur: 'pointer' });
+    if (this.aiBarracks) buildings.push({ b: this.aiBarracks, tint: 0xff5544, cur: 'pointer' });
     for (const { b, tint, cur } of buildings) {
       if (b.hp > 0 && this.hitBuildingAt(w, b)) {
-        this.hoverGfx.lineStyle(2, tint, 0.9);
-        this.hoverGfx.strokeRect(b.x - b.w / 2 - 4, b.y - b.h / 2 - 4, b.w + 8, b.h + 8);
+        this.hoverGfx.lineStyle(7, tint, 0.2);
+        this.hoverGfx.strokeRect(b.x - b.w / 2 - 5, b.y - b.h / 2 - 5, b.w + 10, b.h + 10);
+        this.hoverGfx.lineStyle(3, tint, 0.95);
+        this.hoverGfx.strokeRect(b.x - b.w / 2 - 5, b.y - b.h / 2 - 5, b.w + 10, b.h + 10);
         this.input.setDefaultCursor(cur === 'pointer' ? 'pointer' : 'default');
         return;
       }
@@ -1700,8 +2547,10 @@ export class GameScene extends Phaser.Scene {
     for (const m of this.mines) {
       if (Math.abs(w.x - m.x) < m.w / 2 + 6 && Math.abs(w.y - m.y) < m.h / 2 + 6) {
         const tint = this.selectedUnits.some(u => u.type === 'worker') ? 0xddff88 : 0xaadd77;
-        this.hoverGfx.lineStyle(2, tint, 0.9);
-        this.hoverGfx.strokeRect(m.x - m.w / 2 - 4, m.y - m.h / 2 - 4, m.w + 8, m.h + 8);
+        this.hoverGfx.lineStyle(7, tint, 0.2);
+        this.hoverGfx.strokeRect(m.x - m.w / 2 - 5, m.y - m.h / 2 - 5, m.w + 10, m.h + 10);
+        this.hoverGfx.lineStyle(3, tint, 0.95);
+        this.hoverGfx.strokeRect(m.x - m.w / 2 - 5, m.y - m.h / 2 - 5, m.w + 10, m.h + 10);
         this.input.setDefaultCursor('pointer');
         return;
       }
@@ -1720,7 +2569,10 @@ export class GameScene extends Phaser.Scene {
       const minY = Math.min(w.y, this.dragStart.y);
       const maxX = Math.max(w.x, this.dragStart.x);
       const maxY = Math.max(w.y, this.dragStart.y);
-      if (!pointer.event.shiftKey) this.clearSelection();
+      if (!pointer.event.shiftKey) {
+        this.clearSelection();
+        this.clearBuildingSelection();
+      }
       for (const u of this.units) {
         if (u.faction === 'player' && !u.dead && u.x >= minX && u.x <= maxX && u.y >= minY && u.y <= maxY) {
           this.selectUnit(u);
@@ -1740,12 +2592,18 @@ export class GameScene extends Phaser.Scene {
 
   private handleLeftClick(pointer: Phaser.Input.Pointer) {
     const w = this.wp(pointer);
-    // Click on player barracks → select it (HTML command card shows train buttons)
-    if (this.hitBuildingAt(w, this.playerBarracks) && this.playerBarracks.hp > 0) {
-      this.selectPlayerBarracks();
+    // Click on player base (maurtue) → select for å trene workers
+    if (this.playerBase.hp > 0 && !this.playerBase.underConstruction && this.hitBuildingAt(w, this.playerBase)) {
+      this.selectPlayerBuilding(this.playerBase);
       return;
     }
-    // Clicking a non-barracks empty spot clears the building selection
+    // Click on player barracks → select for å trene soldater (krever ferdig bygd)
+    if (this.playerBarracks && this.playerBarracks.hp > 0 && !this.playerBarracks.underConstruction
+        && this.hitBuildingAt(w, this.playerBarracks)) {
+      this.selectPlayerBuilding(this.playerBarracks);
+      return;
+    }
+    // Clicking elsewhere clears the building selection
     this.clearBuildingSelection();
 
     // Click on player unit → select (double-click → all of same type)
@@ -1765,16 +2623,14 @@ export class GameScene extends Phaser.Scene {
     }
     this.lastClickedUnit = null;
 
-    // Units selected → left-click issues command
-    if (this.selectedUnits.length > 0) {
-      this.issueCommandAt(w);
-    }
+    // SC-stil: venstreklikk på tomt rom deselekterer alt. Kommandoer går via høyreklikk.
+    this.clearSelection();
   }
 
   private handleCommandClick(pointer: Phaser.Input.Pointer) {
     const w = this.wp(pointer);
     // While the barracks is selected, right-click in the world manages the rally point
-    if (this.selectedBuilding === this.playerBarracks) {
+    if (this.playerBarracks && this.selectedBuilding === this.playerBarracks) {
       if (this.hitBuildingAt(w, this.playerBarracks)) {
         this.clearRallyPoint();
       } else {
@@ -1789,12 +2645,33 @@ export class GameScene extends Phaser.Scene {
   private issueCommandAt(w: Vec2) {
     if (this.selectedUnits.length === 0) return;
 
+    // Resume bygging — worker høyreklikker en under-construction-bygning av egen faction
+    for (const b of this.buildings) {
+      if (!b.underConstruction || b.dead || b.hp <= 0) continue;
+      if (b.faction !== 'player') continue;
+      if (Math.abs(w.x - b.x) < b.w / 2 + 6 && Math.abs(w.y - b.y) < b.h / 2 + 6) {
+        const workers = this.selectedUnits.filter(u => u.type === 'worker');
+        if (workers.length === 0) return;
+        // Bare nærmeste worker tildeles bygget (én bygger per byggeplass)
+        let best = workers[0];
+        let bestDist = Phaser.Math.Distance.Between(best.x, best.y, b.x, b.y);
+        for (let i = 1; i < workers.length; i++) {
+          const d = Phaser.Math.Distance.Between(workers[i].x, workers[i].y, b.x, b.y);
+          if (d < bestDist) { best = workers[i]; bestDist = d; }
+        }
+        this.assignWorkerToBuild(best, b);
+        this.spawnCommandRipple(b.x, b.y, 0xddff88);
+        return;
+      }
+    }
+
     // Assign workers to mine
     for (const mine of this.mines) {
       if (Math.abs(w.x - mine.x) < mine.w / 2 + 6 && Math.abs(w.y - mine.y) < mine.h / 2 + 6) {
         const workers = this.selectedUnits.filter(u => u.type === 'worker');
         if (workers.length === 0) return;
         for (const u of workers) {
+          u.buildTarget = null;
           u.mineTarget = mine;
           u.state = 'moving';
           u.moveTarget = { x: mine.x, y: mine.y };
@@ -1817,8 +2694,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Attack enemy building (eller bro — spillere kan rive broer som taktikk)
-    const attackable: BuildingData[] = [this.aiBase, this.aiBarracks, ...this.bridges];
+    // Attack enemy building. Broer er udødelige terreng — ikke targetbare.
+    const attackable: BuildingData[] = [this.aiBase];
+    if (this.aiBarracks) attackable.push(this.aiBarracks);
     for (const b of attackable) {
       if (b.hp > 0 && Math.abs(w.x - b.x) < b.w / 2 + 6 && Math.abs(w.y - b.y) < b.h / 2 + 6) {
         const soldiers = this.selectedUnits.filter(u => u.type === 'soldier');
@@ -1838,6 +2716,7 @@ export class GameScene extends Phaser.Scene {
       const offset = n > 1 ? { x: Phaser.Math.Between(-18, 18), y: Phaser.Math.Between(-18, 18) } : { x: 0, y: 0 };
       u.mineTarget = null;
       u.attackTarget = null;
+      u.buildTarget = null;
       u.state = 'moving';
       u.moveTarget = { x: w.x + offset.x, y: w.y + offset.y };
     });
@@ -1964,11 +2843,13 @@ export class GameScene extends Phaser.Scene {
 
   private clearRallyPoint() {
     if (!this.rallyPoint) return;
+    const px = this.playerBarracks?.x ?? this.playerBase.x;
+    const py = this.playerBarracks?.y ?? this.playerBase.y;
     this.rallyPoint = null;
     this.rallyMarker?.destroy();
     this.rallyMarker = null;
     if (this.rallyLine) { this.rallyLine.destroy(); this.rallyLine = null; }
-    this.spawnCommandRipple(this.playerBarracks.x, this.playerBarracks.y, 0xaaaaaa);
+    this.spawnCommandRipple(px, py, 0xaaaaaa);
   }
 
   private assignSoldierInitialOrder(soldier: UnitData) {
@@ -1992,11 +2873,12 @@ export class GameScene extends Phaser.Scene {
     unit.selected = true;
     if (!this.selectedUnits.includes(unit)) this.selectedUnits.push(unit);
     if (!unit.selectionTween) {
-      unit.selectionRing.setScale(1).setAlpha(1);
+      unit.selectionRing.setScale(1).setAlpha(0.95);
+      unit.selectionGlow.setAlpha(0.22);
       unit.selectionTween = this.tweens.add({
-        targets: unit.selectionRing,
-        scaleX: 1.25, scaleY: 1.25, alpha: 0.45,
-        yoyo: true, repeat: -1, duration: 600, ease: 'Sine.easeInOut',
+        targets: [unit.selectionRing, unit.selectionGlow],
+        alpha: { from: 0.95, to: 0.55 },
+        yoyo: true, repeat: -1, duration: 850, ease: 'Sine.easeInOut',
       });
     }
   }
@@ -2007,7 +2889,8 @@ export class GameScene extends Phaser.Scene {
       if (u.selectionTween) {
         u.selectionTween.stop();
         u.selectionTween = null;
-        u.selectionRing.setScale(1).setAlpha(1);
+        u.selectionRing.setScale(1).setAlpha(0.95);
+        u.selectionGlow.setAlpha(0.22);
       }
     }
     this.selectedUnits = [];
@@ -2015,9 +2898,9 @@ export class GameScene extends Phaser.Scene {
 
   // ── Train panel ──────────────────────────────────────────────────────────
 
-  private selectPlayerBarracks() {
+  private selectPlayerBuilding(b: BuildingData) {
     this.clearSelection();
-    this.selectedBuilding = this.playerBarracks;
+    this.selectedBuilding = b;
   }
 
   private clearBuildingSelection() {
@@ -2025,12 +2908,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   private trainUnit(type: 'worker' | 'soldier') {
-    if (this.playerBarracks.hp <= 0) return;
+    // Workers trenes fra maurtua. Soldater krever en ferdig barakke.
+    let producer: BuildingData | null;
+    if (type === 'worker') {
+      producer = this.playerBase;
+      if (!producer || producer.hp <= 0 || producer.underConstruction) return;
+    } else {
+      producer = this.playerBarracks;
+      if (!producer || producer.hp <= 0 || producer.underConstruction) {
+        this.vfx.floatText(this.playerBase.x, this.playerBase.y - 80, 'Trenger ferdig barakke', '#ee5544');
+        return;
+      }
+    }
     const cost = type === 'worker' ? CONFIG.WORKER_COST : CONFIG.SOLDIER_COST;
     if (this.playerGold < cost) return;
     this.playerGold -= cost;
     this.statsTrained += 1;
-    const { x, y } = this.playerBarracks;
+    if (type === 'worker') this.statsWorkersTrained += 1;
+    else this.statsSoldiersTrained += 1;
+    const { x, y } = producer;
     const unit = this.spawnUnit('player', type, x + Phaser.Math.Between(-22, 22), y + Phaser.Math.Between(-22, 22));
     if (type === 'worker') this.assignWorkerToMine(unit);
     else this.assignSoldierInitialOrder(unit);
@@ -2040,7 +2936,8 @@ export class GameScene extends Phaser.Scene {
   // ── HUD bridge ───────────────────────────────────────────────────────────
 
   private handleHudCommand(c: HudCommand) {
-    if (this.gameState !== 'running' && c.type !== 'restart') return;
+    // V7 — to-menu og restart må fungere i game-over.
+    if (this.gameState !== 'running' && c.type !== 'restart' && c.type !== 'to-menu') return;
     switch (c.type) {
       case 'train': this.trainUnit(c.unit); break;
       case 'select-all-soldiers': this.selectAllOfType('soldier'); break;
@@ -2067,9 +2964,37 @@ export class GameScene extends Phaser.Scene {
       case 'toggle-pause': this.togglePause(); break;
       case 'cycle-speed': this.cycleSpeed(+1); break;
       case 'build-tower-start': this.startBuildMode(c.tower); break;
+      case 'build-start': this.startBuildMode(c.kind); break;
       case 'build-cancel': this.cancelBuildMode(); break;
       case 'formation': this.formationLine(); break;
+      case 'upgrade-base-defense': this.upgradeBaseDefense(); break;
+      case 'to-menu': this.scene.start('MenuScene'); break;
     }
+  }
+
+  /** V5 — beskriv hva enheten gjør akkurat nå, vises i seleksjonspanelet. */
+  private describeUnitAction(u: UnitData): HudSelection['currentAction'] {
+    if (u.state === 'building' && u.buildTarget) {
+      const b = u.buildTarget;
+      const kind = b.kind === 'tower'
+        ? (b.tower ? `${b.tower.type[0].toUpperCase()}${b.tower.type.slice(1)}-tårn` : 'tårn')
+        : b.kind === 'barracks' ? 'barakke'
+        : b.kind === 'farm' ? 'bladlusfarm'
+        : b.kind === 'wall' ? 'mur'
+        : b.kind === 'armory' ? 'våpenkammer'
+        : b.kind;
+      return { type: 'building', label: `Bygger ${kind}`, progress: b.buildProgress ?? 0 };
+    }
+    if (u.state === 'mining' && u.mineTarget) {
+      return { type: 'mining', label: 'Miner mat fra bladlusfarm' };
+    }
+    if (u.state === 'attacking' && u.attackTarget) {
+      return { type: 'attacking', label: 'Angriper' };
+    }
+    if (u.state === 'moving' && u.moveTarget) {
+      return { type: 'moving', label: 'Beveger seg' };
+    }
+    return { type: 'idle', label: 'Venter på ordre' };
   }
 
   private emitHudState() {
@@ -2083,6 +3008,9 @@ export class GameScene extends Phaser.Scene {
       x: b.x, y: b.y, w: b.w, h: b.h, faction: b.faction, kind: b.kind, hp: b.hp, maxHp: b.maxHp,
       control: b.kind === 'mine' ? (b as MineData).control : undefined,
       towerType: b.kind === 'tower' && b.tower ? b.tower.type : undefined,
+      hasDefense: b.kind === 'base' && b.defense ? true : undefined,
+      underConstruction: b.underConstruction ? true : undefined,
+      buildProgress: b.underConstruction ? (b.buildProgress ?? 0) : undefined,
     }));
 
     let selection: HudSelection;
@@ -2090,7 +3018,12 @@ export class GameScene extends Phaser.Scene {
       const b = this.selectedBuilding;
       selection = {
         kind: 'building',
-        building: { x: b.x, y: b.y, w: b.w, h: b.h, faction: b.faction, kind: b.kind, hp: b.hp, maxHp: b.maxHp },
+        building: {
+          x: b.x, y: b.y, w: b.w, h: b.h, faction: b.faction, kind: b.kind, hp: b.hp, maxHp: b.maxHp,
+          hasDefense: b.kind === 'base' && b.defense ? true : undefined,
+          underConstruction: b.underConstruction ? true : undefined,
+          buildProgress: b.underConstruction ? (b.buildProgress ?? 0) : undefined,
+        },
       };
     } else if (this.selectedUnits.length === 0) {
       selection = { kind: 'none' };
@@ -2102,6 +3035,7 @@ export class GameScene extends Phaser.Scene {
         selection = {
           kind: 'units', workers: ws, soldiers: ss,
           singleType: u.type, singleHp: Math.max(0, Math.round(u.hp)), singleMaxHp: u.maxHp,
+          currentAction: this.describeUnitAction(u),
         };
       } else {
         selection = { kind: 'units', workers: ws, soldiers: ss };
@@ -2116,7 +3050,8 @@ export class GameScene extends Phaser.Scene {
         workers: players.filter((u) => u.type === 'worker').length,
         soldiers: players.filter((u) => u.type === 'soldier').length,
         baseHp: this.playerBase.hp, baseMaxHp: this.playerBase.maxHp,
-        barracksHp: this.playerBarracks.hp, barracksMaxHp: this.playerBarracks.maxHp,
+        barracksHp: this.playerBarracks?.hp ?? 0,
+        barracksMaxHp: this.playerBarracks?.maxHp ?? 0,
       },
       enemy: {
         gold: this.aiGold,
@@ -2134,13 +3069,23 @@ export class GameScene extends Phaser.Scene {
         height: this.cameras.main.worldView.height,
       },
       minimap: { units: minimapUnits, buildings: minimapBuildings },
-      stats: { trained: this.statsTrained, goldEarned: this.statsGoldEarned },
+      stats: {
+        trained: this.statsTrained,
+        goldEarned: this.statsGoldEarned,
+        soldiersTrained: this.statsSoldiersTrained,
+        workersTrained: this.statsWorkersTrained,
+        enemyKills: this.statsEnemyKills,
+        unitsLost: this.statsUnitsLost,
+        peakMines: this.statsPeakMines,
+        aiTowers: this.towers.filter(t => t.faction === 'ai' && !t.dead && t.hp > 0).length,
+        playerTowers: this.towers.filter(t => t.faction === 'player' && !t.dead && t.hp > 0).length,
+      },
       gameSpeed: this.gameSpeed,
       alert: this.currentAlert ? { ...this.currentAlert } : null,
       buildMode: this.buildMode ? ({
-        towerType: this.buildMode.towerType,
-        cost: CONFIG.TOWER_TYPES[this.buildMode.towerType].cost,
-        canAfford: this.playerGold >= CONFIG.TOWER_TYPES[this.buildMode.towerType].cost,
+        kind: this.buildMode.kind,
+        cost: this.getBuildSpec(this.buildMode.kind).cost,
+        canAfford: this.playerGold >= this.getBuildSpec(this.buildMode.kind).cost,
       } satisfies HudBuildMode) : null,
       waveMode: CONFIG.WAVE_MODE.enabled ? ({
         current: Math.max(0, this.currentWaveIndex + 1),
@@ -2251,47 +3196,74 @@ export class GameScene extends Phaser.Scene {
     if (this.gameState !== 'running') return;
     // M2.2 — wave-modus håndteres separat i updateWaves()
     if (CONFIG.WAVE_MODE.enabled) return;
+    if (this.aiBase.hp <= 0) return;
 
     const aiAll = this.units.filter(u => u.faction === 'ai' && !u.dead);
     const aiSoldiers = aiAll.filter(u => u.type === 'soldier');
     const aiWorkers = aiAll.filter(u => u.type === 'worker');
-    const canTrain = this.aiBarracks.hp > 0;
+    const playerSoldierCount = this.units.filter(u => u.faction === 'player' && u.type === 'soldier' && !u.dead).length;
 
-    if (canTrain) {
-      if (aiWorkers.length < CONFIG.AI_WORKER_TARGET && this.aiGold >= CONFIG.WORKER_COST) {
-        this.aiGold -= CONFIG.WORKER_COST;
-        const w = this.spawnUnit('ai', 'worker',
-          this.aiBarracks.x + Phaser.Math.Between(-22, 22),
-          this.aiBarracks.y + Phaser.Math.Between(-22, 22));
-        this.assignWorkerToMine(w);
-      } else if (this.aiGold >= CONFIG.SOLDIER_COST) {
-        this.aiGold -= CONFIG.SOLDIER_COST;
-        this.spawnUnit('ai', 'soldier',
-          this.aiBarracks.x + Phaser.Math.Between(-22, 22),
-          this.aiBarracks.y + Phaser.Math.Between(-22, 22));
+    // Barakke-status. aiBarracks-feltet kan være null (aldri bygd) eller dead (rasert);
+    // collapseBuilding nullstiller refen så vi alltid kan stole på .hp/.underConstruction her.
+    const barracksLive = this.aiBarracks && !this.aiBarracks.dead && this.aiBarracks.hp > 0;
+    const barracksReady = !!(this.aiBarracks && barracksLive && !this.aiBarracks.underConstruction);
+    const barracksInProgress = !!(this.aiBarracks && barracksLive && this.aiBarracks.underConstruction);
+
+    // 1) Hvis ingen barakke (verken bygd eller under bygging) og vi har råd og ≥2 workers:
+    //    sett én worker til å bygge en barakke.
+    if (!barracksLive && aiWorkers.length >= 2 && this.aiGold >= CONFIG.BARRACKS_COST) {
+      // Plasser ved siden av maurtua, mot midten
+      // AI base i nord (y lav) → barakke peker sør (positiv y, mot elva).
+      const dirY = this.aiBase.y < CONFIG.MAP_HEIGHT / 2 ? 1 : -1;
+      const spot = this.findAiBuildSpot(dirY);
+      if (spot) {
+        this.aiGold -= CONFIG.BARRACKS_COST;
+        const spec = this.getBuildSpec('barracks');
+        const b = this.createBuilding('barracks', 'ai', spot.x, spot.y, spec.w, spec.h, spec.hp);
+        this.aiBarracks = b;
+        this.beginConstruction(b, 'barracks');
+        // Velg en idle worker, eller den nærmeste mine-worker
+        const idle = aiWorkers.find(u => u.state === 'idle') ?? aiWorkers[0];
+        this.assignWorkerToBuild(idle, b);
       }
     }
 
-    // Re-assign idle workers
-    for (const w of aiWorkers.filter(u => u.state === 'idle')) {
+    // 2) Tren worker fra maurtua hvis under target og har råd
+    if (aiWorkers.length < CONFIG.AI_WORKER_TARGET && this.aiGold >= CONFIG.WORKER_COST) {
+      this.aiGold -= CONFIG.WORKER_COST;
+      const w = this.spawnUnit('ai', 'worker',
+        this.aiBase.x + Phaser.Math.Between(-22, 22),
+        this.aiBase.y + Phaser.Math.Between(-22, 22));
+      this.assignWorkerToMine(w);
+    }
+    // 3) Hvis barakka er klar — tren soldat
+    else if (barracksReady && this.aiBarracks && this.aiGold >= CONFIG.SOLDIER_COST) {
+      this.aiGold -= CONFIG.SOLDIER_COST;
+      this.spawnUnit('ai', 'soldier',
+        this.aiBarracks.x + Phaser.Math.Between(-22, 22),
+        this.aiBarracks.y + Phaser.Math.Between(-22, 22));
+    }
+
+    // Re-assign idle workers til mining (men ikke de som bygger)
+    for (const w of aiWorkers.filter(u => u.state === 'idle' && !u.buildTarget)) {
       this.assignWorkerToMine(w);
     }
 
-    // Attack når threshold nås. Av og til (15%) målretter AI en spillerside-bro
-    // for å rive den og isolere spilleren. Gir AI samme strategiske valg som spilleren.
-    if (aiSoldiers.length >= CONFIG.AI_AGGRESSION_THRESHOLD) {
-      let attackTarget: BuildingData = this.playerBase;
-      const liveBridges = this.bridges.filter(b => !b.dead && b.hp > 0);
-      if (liveBridges.length > 0 && Math.random() < 0.15) {
-        // Velg broen nærmest spillerens base (mest strategisk å ødelegge)
-        let bestBridge = liveBridges[0];
-        let bestDist = Phaser.Math.Distance.Between(bestBridge.x, bestBridge.y, this.playerBase.x, this.playerBase.y);
-        for (let i = 1; i < liveBridges.length; i++) {
-          const d = Phaser.Math.Distance.Between(liveBridges[i].x, liveBridges[i].y, this.playerBase.x, this.playerBase.y);
-          if (d < bestDist) { bestBridge = liveBridges[i]; bestDist = d; }
-        }
-        attackTarget = bestBridge;
-      }
+    // K5 — AI bygger tårn gradvis når økonomien er stabil. Velger nærmeste tower-type
+    // basert på trusselbildet; default stinger. Mindre frekvent enn unit-produksjon.
+    this.maybeAiBuildTower(aiWorkers, playerSoldierCount);
+
+    // V1 — score-basert aggression. Erstatter den binære terskelen:
+    // AI angriper når den har ~jevnt antall soldater (eller bedre) med spilleren,
+    // med en hard min på 2 og hard max på 8 (failsafe). Dette gjør avgjørelsen
+    // adaptive — én ekstra fiende-soldat øker terskelen, ikke vice versa.
+    // Broer er terreng — ikke targets.
+    const effectiveThreshold = Math.max(
+      2,
+      Math.min(8, Math.floor(playerSoldierCount * 0.9) + 1),
+    );
+    if (aiSoldiers.length >= effectiveThreshold) {
+      const attackTarget: BuildingData = this.playerBase;
       for (const s of aiSoldiers) {
         if (s.state !== 'attacking' || !s.attackTarget || s.attackTarget.hp <= 0) {
           s.attackTarget = attackTarget;
@@ -2299,6 +3271,91 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+
+    // Stille warning hvis vi har soldater men ingen barakke i sikte — kun til loop-debug
+    void barracksInProgress;
+  }
+
+  /** K5 — AI tower-bygging. Plasseres direkte (uten worker-bygg-state) for å forenkle. */
+  private maybeAiBuildTower(aiWorkers: UnitData[], playerSoldierCount: number) {
+    const aiTowers = this.towers.filter(t => t.faction === 'ai' && !t.dead && t.hp > 0);
+    if (aiTowers.length >= CONFIG.AI_TOWER_TARGET) return;
+    if (aiWorkers.length < 2) return; // ikke ofre tidlig økonomi
+    if (this.time.now - this.lastAiTowerBuildAt < CONFIG.AI_TOWER_BUILD_INTERVAL) return;
+
+    // Velg tower-type basert på trusselbilde: spitter mot mange soldater, stinger ellers.
+    const type: TowerKind = playerSoldierCount >= 5 ? 'spitter' : 'stinger';
+    const spec = CONFIG.TOWER_TYPES[type];
+    if (this.aiGold < spec.cost) return;
+
+    // Plassering: peker mot midten av kartet (mot elv-grensen) som forsvarsperimeter.
+    const dirY = this.aiBase.y < CONFIG.MAP_HEIGHT / 2 ? 1 : -1;
+    const candidates: Vec2[] = [
+      { x: this.aiBase.x - 180, y: this.aiBase.y + dirY * 120 },
+      { x: this.aiBase.x + 180, y: this.aiBase.y + dirY * 120 },
+      { x: this.aiBase.x - 100, y: this.aiBase.y + dirY * 160 },
+      { x: this.aiBase.x + 100, y: this.aiBase.y + dirY * 160 },
+      { x: this.aiBase.x,       y: this.aiBase.y + dirY * 200 },
+    ];
+    const c = CONFIG.TOWER_PLACE_CLEARANCE;
+    let spot: Vec2 | null = null;
+    for (const p of candidates) {
+      if (p.x < 80 || p.x > CONFIG.MAP_WIDTH - 80) continue;
+      if (p.y < 60 || p.y > CONFIG.MAP_HEIGHT - 60) continue;
+      if (this.riverStateAt(p.x, p.y) !== 'land') continue;
+      if (this.isBlockedByObstacle(p.x, p.y)) continue;
+      if (this.isBlockedByCliff(p.x, p.y)) continue;
+      let ok = true;
+      for (const b of this.buildings) {
+        if (b.dead || b.hp <= 0) continue;
+        if (Phaser.Math.Distance.Between(p.x, p.y, b.x, b.y) < c) { ok = false; break; }
+      }
+      if (ok) { spot = p; break; }
+    }
+    if (!spot) return;
+
+    this.aiGold -= spec.cost;
+    this.lastAiTowerBuildAt = this.time.now;
+    // AI tårn er ferdig umiddelbart — vi har ingen ai-build-state-modell og tårnet trenger
+    // ikke en worker-construction-loop for å fungere.
+    this.createTower(type, spot.x, spot.y, 'ai');
+  }
+
+  /** Speilet helper for DEMO_MODE player-side. dirY peker mot midten av kartet (mot elva). */
+  private findPlayerBuildSpot(dirY: number): Vec2 | null {
+    return this.findBuildSpotFor(this.playerBase, dirY);
+  }
+
+  /** Finn en plassering for AI sin barakke nær maurtua (mot midten av kartet). */
+  private findAiBuildSpot(dirY: number): Vec2 | null {
+    return this.findBuildSpotFor(this.aiBase, dirY);
+  }
+
+  /** Generisk byggested-helper: prøver punkter foran (mot elva) og litt til siden av basen. */
+  private findBuildSpotFor(base: BuildingData, dirY: number): Vec2 | null {
+    const cy = base.y + dirY * 95;
+    const candidates: Vec2[] = [
+      { x: base.x - 130, y: cy },
+      { x: base.x + 130, y: cy },
+      { x: base.x - 90,  y: base.y + dirY * 70 },
+      { x: base.x + 90,  y: base.y + dirY * 70 },
+      { x: base.x,       y: cy },
+    ];
+    const c = CONFIG.BUILD_PLACE_CLEARANCE;
+    for (const p of candidates) {
+      if (p.x < 60 || p.x > CONFIG.MAP_WIDTH - 60) continue;
+      if (p.y < 60 || p.y > CONFIG.MAP_HEIGHT - 60) continue;
+      if (this.riverStateAt(p.x, p.y) !== 'land') continue;
+      if (this.isBlockedByObstacle(p.x, p.y)) continue;
+      if (this.isBlockedByCliff(p.x, p.y)) continue;
+      let ok = true;
+      for (const b of this.buildings) {
+        if (b.dead || b.hp <= 0) continue;
+        if (Phaser.Math.Distance.Between(p.x, p.y, b.x, b.y) < c) { ok = false; break; }
+      }
+      if (ok) return p;
+    }
+    return null;
   }
 
   private assignWorkerToMine(worker: UnitData) {
@@ -2317,7 +3374,12 @@ export class GameScene extends Phaser.Scene {
       if (m.control === faction || m.control === null) safe.push(m);
       else fallback.push(m); // fiende eller contested
     }
-    const pool = safe.length > 0 ? safe : fallback;
+    // Auto-assign foretrekker lavlandsmines: mines på platået er ofte contested
+    // og pathfinding kan låse workere fast oppe når de senere skal bygge i lavlandet.
+    // Spilleren kan fortsatt manuelt høyreklikke en platå-mine.
+    const safeOffPlateau = safe.filter(m => !this.isPointOnPlateau(m.x, m.y));
+    const pool = safeOffPlateau.length > 0 ? safeOffPlateau
+      : (safe.length > 0 ? safe : fallback);
     let best: MineData | null = null;
     let bestDist = Infinity;
     for (const m of pool) {
@@ -2331,29 +3393,49 @@ export class GameScene extends Phaser.Scene {
 
   private playerDecision() {
     if (this.gameState !== 'running') return;
+    if (this.playerBase.hp <= 0) return;
 
     const playerAll = this.units.filter(u => u.faction === 'player' && !u.dead);
     const playerSoldiers = playerAll.filter(u => u.type === 'soldier');
     const playerWorkers = playerAll.filter(u => u.type === 'worker');
-    const canTrain = this.playerBarracks.hp > 0;
 
-    if (canTrain) {
-      if (playerWorkers.length < CONFIG.PLAYER_WORKER_TARGET && this.playerGold >= CONFIG.WORKER_COST) {
-        this.playerGold -= CONFIG.WORKER_COST;
-        const w = this.spawnUnit('player', 'worker',
-          this.playerBarracks.x + Phaser.Math.Between(-22, 22),
-          this.playerBarracks.y + Phaser.Math.Between(-22, 22));
-        this.assignWorkerToMine(w);
-      } else if (this.playerGold >= CONFIG.SOLDIER_COST) {
-        this.playerGold -= CONFIG.SOLDIER_COST;
-        const s = this.spawnUnit('player', 'soldier',
-          this.playerBarracks.x + Phaser.Math.Between(-22, 22),
-          this.playerBarracks.y + Phaser.Math.Between(-22, 22));
-        this.assignSoldierInitialOrder(s);
+    const barracksLive = this.playerBarracks && !this.playerBarracks.dead && this.playerBarracks.hp > 0;
+    const barracksReady = !!(this.playerBarracks && barracksLive && !this.playerBarracks.underConstruction);
+
+    // 1) Bygg barakke om vi mangler en og har råd + ≥2 workers
+    if (!barracksLive && playerWorkers.length >= 2 && this.playerGold >= CONFIG.BARRACKS_COST) {
+      // Player base i sør (y høy) → barakke peker nord (negativ y, mot elva).
+      const dirY = this.playerBase.y < CONFIG.MAP_HEIGHT / 2 ? 1 : -1;
+      const spot = this.findPlayerBuildSpot(dirY);
+      if (spot) {
+        this.playerGold -= CONFIG.BARRACKS_COST;
+        const spec = this.getBuildSpec('barracks');
+        const b = this.createBuilding('barracks', 'player', spot.x, spot.y, spec.w, spec.h, spec.hp);
+        this.playerBarracks = b;
+        this.beginConstruction(b, 'barracks');
+        const idle = playerWorkers.find(u => u.state === 'idle') ?? playerWorkers[0];
+        this.assignWorkerToBuild(idle, b);
       }
     }
 
-    for (const w of playerWorkers.filter(u => u.state === 'idle')) {
+    // 2) Tren worker fra maurtua hvis under target
+    if (playerWorkers.length < CONFIG.PLAYER_WORKER_TARGET && this.playerGold >= CONFIG.WORKER_COST) {
+      this.playerGold -= CONFIG.WORKER_COST;
+      const w = this.spawnUnit('player', 'worker',
+        this.playerBase.x + Phaser.Math.Between(-22, 22),
+        this.playerBase.y + Phaser.Math.Between(-22, 22));
+      this.assignWorkerToMine(w);
+    }
+    // 3) Tren soldat hvis barakke ferdig
+    else if (barracksReady && this.playerBarracks && this.playerGold >= CONFIG.SOLDIER_COST) {
+      this.playerGold -= CONFIG.SOLDIER_COST;
+      const s = this.spawnUnit('player', 'soldier',
+        this.playerBarracks.x + Phaser.Math.Between(-22, 22),
+        this.playerBarracks.y + Phaser.Math.Between(-22, 22));
+      this.assignSoldierInitialOrder(s);
+    }
+
+    for (const w of playerWorkers.filter(u => u.state === 'idle' && !u.buildTarget)) {
       this.assignWorkerToMine(w);
     }
 
@@ -2363,9 +3445,18 @@ export class GameScene extends Phaser.Scene {
       Phaser.Math.Distance.Between(u.x, u.y, this.playerBase.x, this.playerBase.y) < 350
     );
 
+    // V2 — score-basert aggression-terskel (symmetrisk med AI).
+    // surplus angriper når vi har minst like mange (modulo en margin på 0.9) som fiendens
+    // soldater. Hard min 2, hard max 8.
+    const aiSoldierCount = this.units.filter(u =>
+      u.faction === 'ai' && u.type === 'soldier' && !u.dead).length;
+    const effectiveThreshold = Math.max(
+      2,
+      Math.min(8, Math.floor(aiSoldierCount * 0.9) + 1),
+    );
+
     if (threats.length > 0) {
-      // Defenders = soldiers closest to base; rest become surplus that can press the attack
-      // when we have ≥2× the threat count and at least the aggression threshold above defense need.
+      // Defenders = soldiers closest to base; rest become surplus that can press the attack.
       const defendersNeeded = Math.min(playerSoldiers.length, threats.length * 2);
       const sortedByBaseDist = [...playerSoldiers].sort((a, b) =>
         Phaser.Math.Distance.Between(a.x, a.y, this.playerBase.x, this.playerBase.y) -
@@ -2382,14 +3473,14 @@ export class GameScene extends Phaser.Scene {
         }
         if (nearest) { s.attackTarget = nearest; s.state = 'attacking'; }
       }
-      if (surplus.length >= CONFIG.PLAYER_AGGRESSION_THRESHOLD) {
+      if (surplus.length >= effectiveThreshold) {
         for (const s of surplus) {
           const t = s.attackTarget;
           const hasLiveTarget = t !== null && t.hp > 0 && !('dead' in t && (t as UnitData).dead);
           if (!hasLiveTarget) { s.attackTarget = this.aiBase; s.state = 'attacking'; }
         }
       }
-    } else if (playerSoldiers.length >= CONFIG.PLAYER_AGGRESSION_THRESHOLD) {
+    } else if (playerSoldiers.length >= effectiveThreshold) {
       // Offensive: don't interrupt soldiers already fighting a live target
       for (const s of playerSoldiers) {
         const t = s.attackTarget;
@@ -2403,7 +3494,23 @@ export class GameScene extends Phaser.Scene {
 
   private mineTick() {
     if (this.gameState !== 'running') return;
+
+    // M3.1 — Farms gir flat bonus-gull per tick (uavhengig av miner-coverage).
+    let farmBonus = 0;
+    for (const f of this.farms) {
+      if (f.dead || f.hp <= 0 || f.underConstruction) continue;
+      farmBonus += CONFIG.BUILDING_TYPES.farm.bonusGoldPerTick;
+    }
+    if (farmBonus > 0) {
+      this.playerGold += farmBonus;
+      this.statsGoldEarned += farmBonus;
+      // Float-text på første farm så spilleren ser bidraget
+      const firstAlive = this.farms.find(f => !f.dead && f.hp > 0);
+      if (firstAlive) this.vfx.floatText(firstAlive.x, firstAlive.y - 28, `+${farmBonus}`, '#ccff99');
+    }
+
     const R = CONFIG.MINE_CONTEST_RADIUS;
+    const flipNeeded = CONFIG.MINE_FLIP_TICKS;
     for (const mine of this.mines) {
       // Beregn kontroll-status — gjøres uansett om noen miner aktivt, så ringen alltid er korrekt.
       let playerNear = false; let aiNear = false;
@@ -2415,15 +3522,56 @@ export class GameScene extends Phaser.Scene {
         if (playerNear && aiNear) break;
       }
       const prevControl = mine.control;
-      mine.control = playerNear && aiNear ? 'contested'
-        : playerNear ? 'player'
-        : aiNear ? 'ai'
-        : null;
 
-      // Oppdater ring-farge
+      // V3 — Sticky control:
+      // - Eierskap (mine.owner via 'player'|'ai') endres BARE etter `flipNeeded` ticks med kun
+      //   den motsatte siden i radius. Det betyr at en raid må *holde* mina i 3 ticks (~4.5s)
+      //   før den flipper. Dette løser "rock-paper-scissors"-følelsen der én soldat momentant
+      //   stoppet produksjonen.
+      // - Visuelt: `control === 'contested'` brukes kun som transient flag når begge er nær.
+      const prevOwner: 'player' | 'ai' | null =
+        prevControl === 'player' || prevControl === 'ai' ? prevControl : null;
+      let nextOwner: 'player' | 'ai' | null = prevOwner;
+      let contestedNow = false;
+
+      if (playerNear && aiNear) {
+        contestedNow = true;
+        mine.flipPressurePlayer = 0;
+        mine.flipPressureAi = 0;
+      } else if (playerNear && !aiNear) {
+        mine.flipPressureAi = 0;
+        if (prevOwner === 'ai') {
+          mine.flipPressurePlayer++;
+          if (mine.flipPressurePlayer >= flipNeeded) {
+            nextOwner = 'player';
+            mine.flipPressurePlayer = 0;
+          }
+        } else {
+          nextOwner = 'player';
+          mine.flipPressurePlayer = 0;
+        }
+      } else if (aiNear && !playerNear) {
+        mine.flipPressurePlayer = 0;
+        if (prevOwner === 'player') {
+          mine.flipPressureAi++;
+          if (mine.flipPressureAi >= flipNeeded) {
+            nextOwner = 'ai';
+            mine.flipPressureAi = 0;
+          }
+        } else {
+          nextOwner = 'ai';
+          mine.flipPressureAi = 0;
+        }
+      }
+      // ingen i radius → ingenting endres (sticky)
+
+      mine.control = contestedNow ? 'contested' : nextOwner;
+
+      // Oppdater ring-farge. Sticky-decay vises som blinking via alpha-modulering
+      // hvis det er en kamp om eierskap (flipPressure > 0).
       const ringColor = mine.control === 'player' ? 0x6ec8ff
         : mine.control === 'ai' ? 0xff7c5a
-        : mine.control === 'contested' ? 0xff3333
+        : mine.control === 'contested' ? 0xffaa33
         : 0x888888;
       const ringAlpha = mine.control === null ? 0.25 : 0.85;
       mine.controlRing.setStrokeStyle(2, ringColor, ringAlpha);
@@ -2456,13 +3604,19 @@ export class GameScene extends Phaser.Scene {
     const ps = this.units.filter(u => u.faction === 'player' && u.type === 'soldier').length;
     const pw = this.units.filter(u => u.faction === 'player' && u.type === 'worker').length;
     const as_ = this.units.filter(u => u.faction === 'ai' && u.type === 'soldier').length;
+    const playerTowers = this.towers.filter(t => t.faction === 'player' && !t.dead && t.hp > 0).length;
+    const aiTowers = this.towers.filter(t => t.faction === 'ai' && !t.dead && t.hp > 0).length;
+    const playerMines = this.mines.filter(m => m.control === 'player').length;
+    if (playerMines > this.statsPeakMines) this.statsPeakMines = playerMines;
     this.metricsEl.setAttribute('data-state', this.gameState);
     this.metricsEl.setAttribute('data-player-gold', String(this.playerGold));
     this.metricsEl.setAttribute('data-player-soldiers', String(ps));
     this.metricsEl.setAttribute('data-player-workers', String(pw));
     this.metricsEl.setAttribute('data-player-base-hp', String(Math.max(0, this.playerBase.hp)));
+    this.metricsEl.setAttribute('data-player-towers', String(playerTowers));
     this.metricsEl.setAttribute('data-ai-soldiers', String(as_));
     this.metricsEl.setAttribute('data-ai-base-hp', String(Math.max(0, this.aiBase.hp)));
+    this.metricsEl.setAttribute('data-ai-towers', String(aiTowers));
     this.metricsEl.setAttribute('data-game-time', String(Math.floor(this.gameTime)));
   }
 
@@ -2540,20 +3694,26 @@ export class GameScene extends Phaser.Scene {
     const by = this.playerBase.y;
     const radius = CONFIG.ENEMY_NEAR_RADIUS;
     let nearestDist = Infinity;
+    let count = 0;
     for (const u of this.units) {
       if (u.dead || u.faction !== 'ai' || u.type !== 'soldier') continue;
       const d = Phaser.Math.Distance.Between(u.x, u.y, bx, by);
+      if (d < radius) count++;
       if (d < nearestDist) nearestDist = d;
     }
     if (nearestDist < radius) {
-      // Trigger en gang (idempotent — bare ny triggeredAt hvis forrige er gått ut)
+      // V4 — debounce: bare emitt en NY alarm hvis det har gått minst ENEMY_ALERT_COOLDOWN
+      // siden forrige *emitterte* alarm. Soldater som "skvulper" rundt grensen
+      // skal ikke produsere blinkende banner.
+      const cooldownPassed = time - this.lastAlertEmittedAt >= CONFIG.ENEMY_ALERT_COOLDOWN;
       const recentlyTriggered = this.currentAlert && time - this.currentAlert.triggeredAt < 3000;
-      if (!recentlyTriggered) {
+      if (cooldownPassed && !recentlyTriggered) {
         this.currentAlert = {
-          message: 'FIENDE NÆR!',
+          message: count >= 2 ? `FIENDE NÆR! (${count} soldater)` : 'FIENDE NÆR!',
           urgency: 'critical',
           triggeredAt: time,
         };
+        this.lastAlertEmittedAt = time;
       }
     } else if (this.currentAlert && time - this.currentAlert.triggeredAt > 3000) {
       this.currentAlert = null;

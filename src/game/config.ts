@@ -1,13 +1,15 @@
 export type UnitPriority = 'workers' | 'soldiers' | 'balanced';
 
 export const CONFIG = {
-  // Economy
-  STARTING_GOLD: 150,
+  // Economy — Starcraft-aktig opener: 1 worker + 1 maurtue ved start, worker bygger
+  // barakke før soldater kan trenes. STARTING_GOLD må dekke 1-2 ekstra workers og
+  // sparing til en barakke for å lande en troverdig åpningssekvens.
+  STARTING_GOLD: 50,
   GOLD_PER_TICK: 5,
   MINE_TICK_INTERVAL: 1500,
 
   // Units
-  WORKER_COST: 30,
+  WORKER_COST: 25,
   WORKER_SPEED: 80,
   SOLDIER_COST: 50,
   SOLDIER_SPEED: 70,
@@ -18,11 +20,31 @@ export const CONFIG = {
 
   // Buildings
   BASE_HP: 500,
+  BARRACKS_COST: 80,
+  BARRACKS_HP: 200,
 
-  // AI — these are the primary tuning targets for the playtest loop
+  // Konstruksjonstid (ms) per bygning. Worker er låst i 'building'-state hele tida.
+  BARRACKS_BUILD_TIME: 12000,
+  FARM_BUILD_TIME: 8000,
+  WALL_BUILD_TIME: 3000,
+  ARMORY_BUILD_TIME: 10000,
+  TOWER_BUILD_TIME: 7000,
+  BRIDGE_BUILD_TIME: 6000,
+
+  // Visningsnavn for bygninger / ressursnoder. Interne `kind`-strenger holdes uendret
+  // så metric-attributter (data-*-base-hp) ikke brytes.
+  LABELS: {
+    base: 'Maurtue',
+    barracks: 'Barakke',
+    mine: 'Bladlusfarm',
+  },
+
+  // AI — these are the primary tuning targets for the playtest loop.
+  // AGGRESSION_THRESHOLD hevet til 4 og WORKER_TARGET til 4 så AI også må
+  // bygge økonomi før den angriper — gir player en ramp-up-fase.
   AI_DECISION_INTERVAL: 3000,
-  AI_AGGRESSION_THRESHOLD: 2,
-  AI_WORKER_TARGET: 2,
+  AI_AGGRESSION_THRESHOLD: 4,
+  AI_WORKER_TARGET: 4,
   AI_UNIT_PRIORITY: 'balanced' as UnitPriority,
 
   // World — faste verden-dimensjoner, uavhengig av viewport. Camera scroller over denne.
@@ -39,6 +61,8 @@ export const CONFIG = {
 
   // Mines — contested logikk
   MINE_CONTEST_RADIUS: 80,     // px — fiende-units innenfor blokkerer gull-tick
+  /** V3 — antall ticks med kun-motstander-i-radius før kontroll flipper. Skaper "sticky" eierskap. */
+  MINE_FLIP_TICKS: 3,
 
   // Broer (T1-C/T1-B)
   BRIDGE_HP: 150,
@@ -57,6 +81,8 @@ export const CONFIG = {
   // M1 — fiende-varsel
   ENEMY_NEAR_RADIUS: 400,        // px — soldater innenfor denne distansen til player-base trigger varsel
   ENEMY_ALERT_INTERVAL: 500,     // ms — hvor ofte vi sjekker
+  /** V4 — minimum ms mellom to alarm-bannere så vi ikke spammer ved AI-soldater som "skvulper" rundt grensa. */
+  ENEMY_ALERT_COOLDOWN: 8000,
 
   // M1 — audio
   AUDIO_DEFAULT_VOLUME: 0.6,
@@ -70,6 +96,10 @@ export const CONFIG = {
     spitter: { cost: 120, hp: 180, damage: 15, range: 160, fireRate: 1800, splash: 60, slow: 0,    color: 0x8acc6a },
   } as const,
   TOWER_SLOW_DURATION: 1800,       // ms — webber-effekten varer så lenge etter siste treff
+  /** K5 — AI sitt mål for hvor mange tårn den skal ha. Bygges gradvis ved aiDecision-tick. */
+  AI_TOWER_TARGET: 2,
+  /** K5 — minimum ms mellom AI sine tårn-bygginger. */
+  AI_TOWER_BUILD_INTERVAL: 60000,
 
   // M2.2 — Wave Defence
   WAVE_MODE: {
@@ -91,6 +121,23 @@ export const CONFIG = {
 
   // M2.3 — Choke-formasjon (F-tast)
   FORMATION_SPACING: 28,           // px — avstand mellom soldater i linjen
+
+  // M3.1 — Bygg (Farm / Wall / Armory). Bruker delt build-mode med towers.
+  BUILD_RADIUS: 500,               // px — bygg må plasseres innenfor denne radius fra player-base
+  BUILD_PLACE_CLEARANCE: 38,       // px — minimum avstand til andre bygninger
+  BUILDING_TYPES: {
+    farm:   { cost: 60,  hp: 100, w: 38, h: 32, color: 0x6ba84a, bonusGoldPerTick: 2 },
+    wall:   { cost: 20,  hp: 300, w: 30, h: 30, color: 0x6c5a3a, bonusGoldPerTick: 0 },
+    armory: { cost: 100, hp: 150, w: 40, h: 40, color: 0x9a7a3a, bonusGoldPerTick: 0 },
+  } as const,
+  WALL_BLOCK_RADIUS: 18,           // px — units kan ikke gå nærmere enn dette inn i en wall
+
+  // M3.2 — Base "Forsvar"-oppgradering
+  BASE_DEFENSE_COST: 100,          // mat
+  BASE_DEFENSE_HP_BONUS: 200,
+  BASE_DEFENSE_RANGE: 160,
+  BASE_DEFENSE_DAMAGE: 10,
+  BASE_DEFENSE_FIRE_RATE: 1500,    // ms
 };
 
 // Ant-tema visuell palett — alle rendering-konstanter samlet her
