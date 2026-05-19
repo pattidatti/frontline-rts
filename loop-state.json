@@ -1,11 +1,11 @@
 {
-  "run": 12,
+  "run": 13,
   "max_runs": 200,
   "phase": "balance",
   "win_rate_last_5": 0.4,
-  "avg_duration_last_10": 86,
-  "notes": "Run 12: STALL-bug oppdaget — workers ble auto-tildelt contested mine på platået (nærmeste mine ved start), klarte ikke å forlate platået igjen pga cliff-pathfinding, og barakka ble derfor aldri ferdig bygd. Stalemate ved 200+s med begge baser på 500 HP og 0 soldater. Code-fix: nearestMineForFaction foretrekker nå safe non-plateau mines. Med fix: spillet kjørte normalt (begge barakker ferdig på ~30s, units trent, AI vant på 109s — AI overkjørte med 9 soldater før player rakk å snowball). Last 5: L-L-W-W-L = 0.4. Avg_duration_last_10 86s. consecutive_balanced 1→0 (fix endrer dynamikk; restarter telleren).",
-  "consecutive_balanced": 0,
+  "avg_duration_last_10": 92,
+  "notes": "Run 13: ingen patch. Win_rate 0.4 (L-W-W-L-L siste 5), avg_duration 92s — begge innenfor balance-rangene (0.3-0.7 og 60-300s). consecutive_balanced 0→1. Spillet kjørte normalt — begge barakker bygd, units trent, AI vant på 108s med 9 soldater mot player 12 (player-soldater nådde aldri fram til AI-basen, AI overrant player-basen).",
+  "consecutive_balanced": 1,
   "ai_features_generated": 0,
   "last_error": null,
   "victory_conditions": {
@@ -160,6 +160,18 @@
       "ai_soldiers": 9,
       "player_gold": 60,
       "action": "code-fix: nearestMineForFaction foretrekker safe non-plateau mines. Workers ble tidligere auto-tildelt contested mine på platået og pathfinding-låst der — barakka ble aldri ferdig. Lagt til isPointOnPlateau-helper. consecutive_balanced 1→0."
+    },
+    {
+      "run": 13,
+      "state": "lost",
+      "game_time": 108,
+      "player_base_hp": 0,
+      "ai_base_hp": 500,
+      "player_soldiers": 12,
+      "player_workers": 3,
+      "ai_soldiers": 9,
+      "player_gold": 45,
+      "action": "balance: ingen patch (win_rate=0.4, avg_duration=92s — innenfor 0.3-0.7 og 60-300s). consecutive_balanced 0→1."
     }
   ],
   "backlog": [
