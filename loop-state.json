@@ -1,11 +1,11 @@
 {
-  "run": 10,
+  "run": 11,
   "max_runs": 200,
   "phase": "balance",
-  "win_rate_last_5": 0.2,
-  "avg_duration_last_10": 74,
-  "notes": "Run 10 (PLAYER code-fix fra run 9 + AI_threshold=3): VANT på 91s — første seier i loopen! Player 13 soldater (3 workers, 60 HP base) knuste AI-base (0 HP, 8 soldater). Code-fix (defenders/surplus split) virket: player presset AI-base mens 6 AI-trusler ble holdt ute. Win rate sist 5: 0.2 (1/5). Protokoll: win_rate<0.3 → AI_AGGRESSION_THRESHOLD -1 (3→2, min). Test om threshold=2 nå er balansert med smartere player AI.",
-  "consecutive_balanced": 0,
+  "win_rate_last_5": 0.4,
+  "avg_duration_last_10": 79,
+  "notes": "Run 11 (AI_threshold=2 fra run 10): VANT på 93s med 240 HP base igjen — andre seier på rad. Player 13 soldater dro ned AI-base til 0 mens 9 AI-soldater fortsatt sto. Win rate sist 5 nå 0.4 (2/5), avg_duration 79s. BÅDE win_rate (0.3-0.7) OG avg_duration (60-300s) er innenfor balanse-bånd. Ingen patch denne runden. consecutive_balanced 0→1. Trenger 5 for å gå til feature-fase.",
+  "consecutive_balanced": 1,
   "ai_features_generated": 0,
   "last_error": null,
   "victory_conditions": {
@@ -136,6 +136,18 @@
       "ai_soldiers": 8,
       "player_gold": 30,
       "action": "balance: AI_AGGRESSION_THRESHOLD 3→2 (win_rate<0.3 etter første seier; tester om smartere player AI fra run 9 håndterer aggressiv AI bedre enn run 7)"
+    },
+    {
+      "run": 11,
+      "state": "won",
+      "game_time": 93,
+      "player_base_hp": 240,
+      "ai_base_hp": 0,
+      "player_soldiers": 13,
+      "player_workers": 3,
+      "ai_soldiers": 9,
+      "player_gold": 10,
+      "action": "balance: ingen patch (win_rate=0.4, avg_duration=79s — innenfor 0.3-0.7 og 60-300s). consecutive_balanced 0→1."
     }
   ],
   "backlog": [
