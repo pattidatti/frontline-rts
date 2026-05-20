@@ -1,11 +1,10 @@
 import Phaser from 'phaser';
-import { CONFIG, THEME } from '../config';
+import { THEME } from '../config';
 
 /**
  * Start-meny — første scene som vises etter BootScene.
  *
- * I DEMO_MODE auto-startes GameScene etter 500ms slik at Playwright-loopen
- * ikke henger på menyen. Manuell: klikk Play-knappen eller trykk Enter / Space.
+ * Klikk Play-knappen eller trykk Enter / Space for å starte spillet.
  */
 export class MenuScene extends Phaser.Scene {
   private playStarted = false;
@@ -36,7 +35,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     // Tittel
-    const title = this.add.text(cx, cy - 130, 'FRONTLINE RTS', {
+    const title = this.add.text(cx, cy - 130, 'FRONTLINE TD', {
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '64px',
       fontStyle: 'bold',
@@ -44,7 +43,7 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5).setShadow(0, 4, '#000', 14, true, true);
 
     // Tag-line
-    this.add.text(cx, cy - 70, 'Maur-kolonien i sør mot fienden i nord.', {
+    this.add.text(cx, cy - 70, 'Forsvar maurtua. Send soldater i 3 lanes. Overlev 15 bølger.', {
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '18px',
       color: '#c8b088',
@@ -109,11 +108,6 @@ export class MenuScene extends Phaser.Scene {
     // Keyboard-shortcuts
     this.input.keyboard?.on('keydown-SPACE', () => this.startPlay());
     this.input.keyboard?.on('keydown-ENTER', () => this.startPlay());
-
-    // DEMO_MODE: auto-start så Playwright-loopen ikke henger
-    if (CONFIG.DEMO_MODE) {
-      this.time.delayedCall(500, () => this.startPlay());
-    }
   }
 
   private startPlay() {
