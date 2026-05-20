@@ -51,6 +51,21 @@ export const CONFIG = {
   MAP_WIDTH: 2560,
   MAP_HEIGHT: 1440,
 
+  // ───── Tower Defense (3-lane) ─────
+  // Lanes går horisontalt. Player-base i vest (lav x), fiende-spawn i øst (høy x).
+  // Hver lane har et y-bånd med halvbredde — enheter spawnes på lane.y og er låst dit.
+  LANES: [
+    { id: 0, y: 360,  halfHeight: 90, label: 'Nord' },
+    { id: 1, y: 720,  halfHeight: 90, label: 'Midt' },
+    { id: 2, y: 1080, halfHeight: 90, label: 'Sør'  },
+  ] as ReadonlyArray<{ id: 0 | 1 | 2; y: number; halfHeight: number; label: string }>,
+  PLAYER_BASE_X: 200,
+  ENEMY_SPAWN_X: 2360,
+  LANE_SOLDIER_COST: 30,
+  PASSIVE_INCOME_PER_TICK: 4,
+  KILL_GOLD: 5,
+  WAVE_PREP_MS: 25000,
+
   // Viewport (canvas) — settes av PhaserGame.syncConfigToViewport() ved oppstart/resize.
   VIEWPORT_WIDTH: 1280,
   VIEWPORT_HEIGHT: 720,
@@ -101,22 +116,28 @@ export const CONFIG = {
   /** K5 — minimum ms mellom AI sine tårn-bygginger. */
   AI_TOWER_BUILD_INTERVAL: 60000,
 
-  // M2.2 — Wave Defence
+  // M2.2 — Wave Defence (TD-modus, alltid på)
+  // `lane` styrer hvor creeps spawner: 0/1/2 = spesifikk lane, 'all' = distribuer på alle 3.
+  // `spawnInterval` = ms mellom hver creep-spawn innen bølgen.
   WAVE_MODE: {
-    enabled: false,
-    // delay = ms etter forrige bølge før denne starter; soldiers = antall som spawnes
+    enabled: true,
     waves: [
-      { delay: 25000, soldiers: 3,  tank: false, boss: false },
-      { delay: 30000, soldiers: 4,  tank: false, boss: false },
-      { delay: 35000, soldiers: 5,  tank: false, boss: false },
-      { delay: 40000, soldiers: 6,  tank: false, boss: false },
-      { delay: 45000, soldiers: 7,  tank: false, boss: false },
-      { delay: 45000, soldiers: 8,  tank: false, boss: false },
-      { delay: 50000, soldiers: 9,  tank: false, boss: false },
-      { delay: 55000, soldiers: 10, tank: false, boss: false },
-      { delay: 60000, soldiers: 12, tank: false, boss: false },
-      { delay: 70000, soldiers: 15, tank: false, boss: true  },
-    ] as ReadonlyArray<{ delay: number; soldiers: number; tank: boolean; boss: boolean }>,
+      { soldiers: 4,  spawnInterval: 1200, lane: 'all' as const, tank: false, boss: false },
+      { soldiers: 5,  spawnInterval: 1100, lane: 1     as const, tank: false, boss: false },
+      { soldiers: 6,  spawnInterval: 1000, lane: 'all' as const, tank: false, boss: false },
+      { soldiers: 7,  spawnInterval: 950,  lane: 0     as const, tank: false, boss: false },
+      { soldiers: 8,  spawnInterval: 900,  lane: 'all' as const, tank: true,  boss: false },
+      { soldiers: 9,  spawnInterval: 850,  lane: 2     as const, tank: false, boss: false },
+      { soldiers: 10, spawnInterval: 800,  lane: 'all' as const, tank: true,  boss: false },
+      { soldiers: 11, spawnInterval: 800,  lane: 1     as const, tank: false, boss: false },
+      { soldiers: 12, spawnInterval: 750,  lane: 'all' as const, tank: true,  boss: false },
+      { soldiers: 13, spawnInterval: 750,  lane: 'all' as const, tank: true,  boss: false },
+      { soldiers: 14, spawnInterval: 700,  lane: 'all' as const, tank: true,  boss: false },
+      { soldiers: 15, spawnInterval: 700,  lane: 'all' as const, tank: true,  boss: false },
+      { soldiers: 16, spawnInterval: 650,  lane: 'all' as const, tank: true,  boss: false },
+      { soldiers: 18, spawnInterval: 650,  lane: 'all' as const, tank: true,  boss: false },
+      { soldiers: 20, spawnInterval: 600,  lane: 'all' as const, tank: true,  boss: true  },
+    ] as ReadonlyArray<{ soldiers: number; spawnInterval: number; lane: 0 | 1 | 2 | 'all'; tank: boolean; boss: boolean }>,
   },
 
   // M2.3 — Choke-formasjon (F-tast)
