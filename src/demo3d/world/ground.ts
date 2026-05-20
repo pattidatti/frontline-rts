@@ -19,13 +19,12 @@ export function createGround(width: number, depth: number): Ground {
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
-    // suppress around river
-    const riverMask = Math.exp(-Math.pow(z / 8, 2));
+    // gentle rolling terrain — low amplitude so lanes/arenas overlay cleanly
     const h =
-      Math.sin(x * 0.08) * Math.cos(z * 0.06) * 0.6 +
-      Math.sin(x * 0.21 + z * 0.13) * 0.3 +
-      Math.sin(x * 0.5 + z * 0.7) * 0.12;
-    pos.setY(i, h * (1 - riverMask * 0.8));
+      Math.sin(x * 0.04) * Math.cos(z * 0.06) * 0.22 +
+      Math.sin(x * 0.13 + z * 0.09) * 0.12 +
+      Math.sin(x * 0.4 + z * 0.5) * 0.05;
+    pos.setY(i, h);
   }
   geo.computeVertexNormals();
 
@@ -102,18 +101,10 @@ export function createGround(width: number, depth: number): Ground {
         vec3 grass = mix(uGrassBottom, uGrassColor, n);
         grass = mix(grass, uGrassBladeColor, smoothstep(0.55, 0.85, n2) * 0.6);
 
-        // dirt patches around the river and on hills
-        float riverPath = smoothstep(8.0, 0.0, abs(p.z));
+        // organic dirt patches (lane meshes overlay separately)
         float dirtN = fbm(p.xz * 0.05 + 5.0);
-        float dirt = smoothstep(0.55, 0.85, dirtN);
-        vec3 col = mix(grass, uDirtColor, dirt * 0.7);
-
-        // sandy banks of the river
-        col = mix(col, uPathColor, riverPath * 0.85);
-
-        // worn lanes between the two bases (vertical strip)
-        float lane = exp(-pow((p.x - 0.0) / 6.0, 2.0)) * 0.35;
-        col = mix(col, uPathColor, lane * (1.0 - riverPath));
+        float dirt = smoothstep(0.6, 0.9, dirtN);
+        vec3 col = mix(grass, uDirtColor, dirt * 0.5);
 
         // soft tuft variation (smooth, not speckle)
         if (uGrass > 0.5) {
@@ -122,7 +113,7 @@ export function createGround(width: number, depth: number): Ground {
         }
         // tiny pebbles (kept sparse)
         float pebble = step(0.92, fbm(p.xz * 2.0 + 7.0));
-        col = mix(col, vec3(0.45, 0.4, 0.32), pebble * 0.5 * (1.0 - riverPath));
+        col = mix(col, vec3(0.45, 0.4, 0.32), pebble * 0.5);
 
         // simple lambert-ish with normal
         vec3 L = normalize(vec3(0.4, 0.9, 0.3));
@@ -136,7 +127,7 @@ export function createGround(width: number, depth: number): Ground {
 
         // wind shimmer (subtle highlight rolling across)
         float wind = sin((p.x * 0.08 + p.z * 0.05) + uTime * 0.6) * 0.5 + 0.5;
-        lit += uGrassBladeColor * wind * 0.03 * (1.0 - dirt) * (1.0 - riverPath);
+        lit += uGrassBladeColor * wind * 0.03 * (1.0 - dirt);
 
         // exponential fog
         float fogFactor = 1.0 - exp(-uFogDensity * uFogDensity * vDist * vDist);
