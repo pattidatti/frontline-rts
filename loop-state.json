@@ -1,10 +1,10 @@
 {
   "run": 17,
   "max_runs": 200,
-  "phase": "balance",
+  "phase": "paused",
   "win_rate_last_5": 0.0,
   "avg_duration_last_10": 104,
-  "notes": "Run 17: lost 142s. AI-base aldri skadet (500 HP gjennom hele kampen) — player AI lagde 9-12 soldater men landet aldri angrep. Win_rate=0.0 siste 5. AI_AGGRESSION_THRESHOLD allerede på min=2. Patch: AI_DECISION_INTERVAL 3000→3500 (sekundær AI-svekkelse) per protokoll-alternativ.",
+  "notes": "PAUSED 2026-05-20: Spillet pivoteres fra RTS til Tower Defense (3 lanes, wave-basert). Loopen settes pause så cron ikke patcher config.ts under refaktor. Backlog/history er irrelevant for det nye design — vil resettes etter pivot.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
   "last_error": null,

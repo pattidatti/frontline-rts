@@ -50,6 +50,14 @@ export interface HudWaveState {
   nextInMs: number;
   /** true når bølge er aktiv (units i spawnet pågår). */
   active: boolean;
+  /** TD: true i prep-fase mellom waves (klar-knapp tilgjengelig). */
+  preparing?: boolean;
+  /** TD: ms igjen av prep-fasen før auto-start. */
+  prepRemainingMs?: number;
+  /** TD: oppsummering av neste bølge (vises i banner). */
+  nextWavePreview?: { soldiers: number; lane: 0 | 1 | 2 | 'all'; tank: boolean; boss: boolean };
+  /** TD: antall creeps igjen som ikke er drept i nåværende bølge. */
+  remainingEnemies?: number;
 }
 
 export interface HudSelection {
@@ -142,7 +150,11 @@ export type HudCommand =
   | { type: 'formation' }
   | { type: 'upgrade-base-defense' }
   /** V7 — tilbake til MenuScene fra game-over. */
-  | { type: 'to-menu' };
+  | { type: 'to-menu' }
+  /** TD — spawn én soldat i valgt lane. */
+  | { type: 'send-lane'; lane: 0 | 1 | 2 }
+  /** TD — hopp over resterende prep-tid og start neste wave. */
+  | { type: 'wave-ready' };
 
 type StateListener = (s: HudState) => void;
 type CommandListener = (c: HudCommand) => void;
