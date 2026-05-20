@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Frontline RTS — 3D Isometric Demo</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; padding: 0; height: 100%; background: #050a08; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; color: #f0e6c8; }
+      #c { display: block; width: 100vw; height: 100vh; }
+      #hud {
+        position: absolute; inset: 0; pointer-events: none; user-select: none;
+        display: flex; flex-direction: column; justify-content: space-between;
+        padding: 24px 32px;
+      }
+      .topbar {
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
+      }
+      .brand {
+        font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase;
+        color: #c2b07a; opacity: 0.9;
+      }
+      .brand h1 {
+        font-family: 'Georgia', 'Times New Roman', serif;
+        font-size: 26px; letter-spacing: 0.06em; margin: 4px 0 0;
+        color: #ffe9b5; text-shadow: 0 2px 12px rgba(0,0,0,0.55), 0 0 22px rgba(255,180,80,0.18);
+      }
+      .brand p { margin: 6px 0 0; font-size: 12px; opacity: 0.65; letter-spacing: 0.04em; }
+      .panel {
+        background: linear-gradient(180deg, rgba(20,14,10,0.55), rgba(8,6,4,0.55));
+        border: 1px solid rgba(200,170,100,0.18);
+        backdrop-filter: blur(10px) saturate(140%);
+        -webkit-backdrop-filter: blur(10px) saturate(140%);
+        border-radius: 14px;
+        padding: 14px 18px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,220,160,0.06);
+        pointer-events: auto;
+      }
+      .controls { display: flex; flex-direction: column; gap: 10px; min-width: 230px; }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+      .row label { letter-spacing: 0.06em; text-transform: uppercase; color: #d8c997; }
+      .row span { color: #fff3c8; }
+      .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+      button.b {
+        flex: 1 1 auto;
+        background: linear-gradient(180deg, #3a2818, #1a100a);
+        border: 1px solid rgba(220,180,100,0.25);
+        color: #ffe9b5;
+        font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+        padding: 8px 10px; border-radius: 8px; cursor: pointer;
+        transition: transform .12s, border-color .12s, box-shadow .12s;
+      }
+      button.b:hover { border-color: rgba(255,200,120,0.7); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,160,60,0.18); }
+      button.b.active { background: linear-gradient(180deg, #6a4222, #2a180c); border-color: #f4c878; box-shadow: inset 0 1px 0 rgba(255,220,160,0.22); }
+      .legend { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; font-size: 11px; opacity: 0.85; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; align-self: center; box-shadow: 0 0 8px currentColor; }
+      .bottombar { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+      .footnote { font-size: 11px; opacity: 0.6; letter-spacing: 0.05em; }
+      .stat-line { font-variant-numeric: tabular-nums; color: #fff3c8; }
+      .vignette {
+        position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(120% 80% at 50% 60%, transparent 50%, rgba(0,0,0,0.55) 100%);
+      }
+      .loading {
+        position: absolute; inset: 0; display: grid; place-items: center;
+        background: #050a08; transition: opacity .6s; z-index: 10;
+        font-size: 13px; letter-spacing: 0.3em; color: #c2b07a; text-transform: uppercase;
+      }
+      .loading.hidden { opacity: 0; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div class="vignette"></div>
+    <div id="hud">
+      <div class="topbar">
+        <div class="panel brand">
+          <div>FRONTLINE RTS — KONSEPT</div>
+          <h1>Den mørke kolonien</h1>
+          <p>Isometrisk 3D · sanntid · maur-tema</p>
+        </div>
+        <div class="panel controls">
+          <div class="row"><label>Tid på døgnet</label><span id="time-label">Skumring</span></div>
+          <div class="btns" id="time-btns">
+            <button class="b" data-time="dawn">Daggry</button>
+            <button class="b active" data-time="dusk">Skumring</button>
+            <button class="b" data-time="night">Natt</button>
+            <button class="b" data-time="auto">Auto</button>
+          </div>
+          <div class="row"><label>Kamera</label><span id="cam-label">Roterer</span></div>
+          <div class="btns">
+            <button class="b" data-cam="static">Fast</button>
+            <button class="b active" data-cam="orbit">Roter</button>
+            <button class="b" data-cam="fly">Fly-over</button>
+          </div>
+          <div class="row"><label>Bloom</label><span id="bloom-label">På</span></div>
+          <div class="btns">
+            <button class="b" data-toggle="bloom">Skru av/på</button>
+            <button class="b" data-toggle="fog">Tåke</button>
+            <button class="b" data-toggle="grass">Gress</button>
+          </div>
+        </div>
+      </div>
+      <div class="bottombar">
+        <div class="panel">
+          <div class="legend">
+            <div class="dot" style="color:#1a1410"></div><div>Mørk koloni (du)</div>
+            <div class="dot" style="color:#c66020"></div><div>Rød koloni (AI)</div>
+            <div class="dot" style="color:#88dd66"></div><div>Bladlus-farm</div>
+            <div class="dot" style="color:#f4c878"></div><div>Maurtue / tårn</div>
+          </div>
+        </div>
+        <div class="panel footnote">
+          <div class="stat-line" id="stat-units">Maur: <b>—</b></div>
+          <div class="stat-line" id="stat-fps">FPS: <b>—</b></div>
+          <div style="margin-top:6px">Drag for å panorere · Scroll for zoom · Mellomrom = pause kamera</div>
+        </div>
+      </div>
+    </div>
+    <div class="loading" id="loading">Vekker kolonien...</div>
+    <script type="module" src="/src/demo3d/main.ts"></script>
+  </body>
+</html>
