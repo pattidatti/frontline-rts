@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { hudBridge, type HudState, type TowerKind } from '../game/hudBridge';
+import { hudBridge, type HudState, type TowerKind, type BuildKind } from '../game/hudBridge';
 import { getVolume, setVolume, onVolumeChange } from '../game/audio';
 import { CONFIG } from '../game/config';
 import './HudOverlay.css';
@@ -350,78 +350,366 @@ function Minimap({ s }: { s: HudState }) {
   );
 }
 
-// ── Command card ───────────────────────────────────────────────────────
+// ── Lane command stack ─────────────────────────────────────────────────
+//
+// Erstatter det gamle CommandCard-gridet. Ett view om gangen:
+//   - 'home'  → 3 lane-knapper + 1 bygg-knapp (vertikal stack)
+//   - 'lane'  → produksjons-meny for valgt lane (hotkeys 1-6)
+//   - 'build' → samlet tårn/bygg-meny (hotkeys 1-6, 3 grå/disabled inntil videre)
+// ESC backer tilbake til home. Alle paneler har varierte CSS-animasjoner
+// (morph, pop, flip, bounce) for å gjøre HUD-en gøy å trykke på.
 
-function CommandCard({ s }: { s: HudState }) {
-  const laneCost = s.costs.soldier;   // GameScene mapper LANE_SOLDIER_COST → costs.soldier
+type LaneStackView =
+  | { kind: 'home' }
+  | { kind: 'lane'; lane: 0 | 1 | 2 }
+  | { kind: 'build' };
+
+type LaneOption = {
+  id: string;
+  label: string;
+  hotkey: '1' | '2' | '3' | '4' | '5' | '6';
+  costFromState: (s: HudState) => number;
+  icon: (size: number) => React.ReactNode;
+  describe: string;
+  toCommand: (lane: 0 | 1 | 2) => Parameters<typeof hudBridge.sendCommand>[0];
+};
+
+// Datadrevet liste — utvid med flere enheter når de er implementert i GameScene.
+const LANE_OPTIONS: LaneOption[] = [
+  {
+    id: 'soldier',
+    label: 'Soldat',
+    hotkey: '1',
+    costFromState: (s) => s.costs.soldier,
+    icon: (size) => <AntIcon size={size} kind="soldier" />,
+    describe: 'Marsjerer mot fiende-spawnen',
+    toCommand: (lane) => ({ type: 'send-lane', lane }),
+  },
+];
+
+type BuildOption = {
+  id: BuildKind;
+  label: string;
+  hotkey: '1' | '2' | '3' | '4' | '5' | '6';
+  cost: number;
+  enabled: boolean;
+  category: 'tower' | 'building';
+  describe: string;
+};
+
+const BUILD_OPTIONS: BuildOption[] = [
+  { id: 'stinger', label: 'Spydd',  hotkey: '1', cost: 80,  enabled: true,  category: 'tower',    describe: 'Single-target — høy skade' },
+  { id: 'webber',  label: 'Nett',   hotkey: '2', cost: 100, enabled: true,  category: 'tower',    describe: 'Sløver fienden 50 %' },
+  { id: 'spitter', label: 'Spytt',  hotkey: '3', cost: 120, enabled: true,  category: 'tower',    describe: 'Splash-skade i område' },
+  { id: 'farm',    label: 'Farm',   hotkey: '4', cost: 60,  enabled: false, category: 'building', describe: 'Kommer snart' },
+  { id: 'wall',    label: 'Mur',    hotkey: '5', cost: 20,  enabled: false, category: 'building', describe: 'Kommer snart' },
+  { id: 'armory',  label: 'Smie',   hotkey: '6', cost: 100, enabled: false, category: 'building', describe: 'Kommer snart' },
+];
+
+const LANE_META: Array<{ lane: 0 | 1 | 2; hotkey: '1' | '2' | '3'; label: string; arrow: string }> = [
+  { lane: 0, hotkey: '1', label: 'Nord', arrow: '↑' },
+  { lane: 1, hotkey: '2', label: 'Midt', arrow: '→' },
+  { lane: 2, hotkey: '3', label: 'Sør',  arrow: '↓' },
+];
+
+function countSoldiersPerLane(s: HudState): [number, number, number] {
+  const counts: [number, number, number] = [0, 0, 0];
+  const lanes = CONFIG.LANES;
+  if (!lanes) return counts;
+  for (const u of s.minimap.units) {
+    if (u.faction !== 'player' || u.type !== 'soldier') continue;
+    for (let i = 0; i < 3 && i < lanes.length; i++) {
+      if (Math.abs(u.y - lanes[i].y) <= lanes[i].halfHeight) {
+        counts[i]++;
+        break;
+      }
+    }
+  }
+  return counts;
+}
+
+// Liten utility: trigger CSS-animasjon på et element ved å reflowe + re-add klassen.
+function playShake(el: HTMLElement | null) {
+  if (!el) return;
+  el.classList.remove('shaking');
+  // force reflow så animasjonen restartes
+  void el.offsetWidth;
+  el.classList.add('shaking');
+}
+
+function LaneCommandStack({ s }: { s: HudState }) {
+  const [view, setView] = useState<LaneStackView>({ kind: 'home' });
+  const panelRef = useRef<HTMLDivElement>(null);
   const buildActive = !!s.buildMode;
-  const cantSend = s.player.gold < laneCost;
 
-  const towers: { key: string; type: TowerKind; label: string; cost: number }[] = [
-    { key: '1', type: 'stinger', label: 'Spydd',  cost: 80  },
-    { key: '2', type: 'webber',  label: 'Nett',   cost: 100 },
-    { key: '3', type: 'spitter', label: 'Spytt',  cost: 120 },
-  ];
+  // Refs så hotkey-handleren ikke re-attaches på hver state-push (~60Hz).
+  const stateRef = useRef(s);
+  const viewRef = useRef(view);
+  const buildActiveRef = useRef(buildActive);
+  stateRef.current = s;
+  viewRef.current = view;
+  buildActiveRef.current = buildActive;
 
-  const laneButtons: { key: string; lane: 0 | 1 | 2; label: string }[] = [
-    { key: 'Q', lane: 0, label: 'Nord-lane'  },
-    { key: 'R', lane: 1, label: 'Midt-lane'  },
-    { key: 'E', lane: 2, label: 'Sør-lane'   },
-  ];
+  // Hotkey-handler: 1/2/3/B i home, 1-6 i menyene, Esc tilbake.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      const k = e.key;
+      const v = viewRef.current;
+      const st = stateRef.current;
+
+      if (v.kind === 'home') {
+        if (k === '1' || k === '2' || k === '3') {
+          setView({ kind: 'lane', lane: (parseInt(k, 10) - 1) as 0 | 1 | 2 });
+          e.preventDefault();
+        } else if (k === 'b' || k === 'B') {
+          setView({ kind: 'build' });
+          e.preventDefault();
+        }
+        return;
+      }
+
+      if (v.kind === 'lane') {
+        if (k === 'Escape') {
+          setView({ kind: 'home' });
+          e.preventDefault();
+          return;
+        }
+        const opt = LANE_OPTIONS.find((o) => o.hotkey === k);
+        if (opt) {
+          const cost = opt.costFromState(st);
+          if (st.player.gold >= cost) {
+            hudBridge.sendCommand(opt.toCommand(v.lane));
+          } else {
+            playShake(panelRef.current?.querySelector(`[data-hotkey="${k}"]`) ?? null);
+          }
+          e.preventDefault();
+        }
+        return;
+      }
+
+      if (v.kind === 'build') {
+        if (k === 'Escape') {
+          if (buildActiveRef.current) hudBridge.sendCommand({ type: 'build-cancel' });
+          setView({ kind: 'home' });
+          e.preventDefault();
+          return;
+        }
+        const opt = BUILD_OPTIONS.find((o) => o.hotkey === k);
+        if (opt) {
+          if (opt.enabled && st.player.gold >= opt.cost) {
+            hudBridge.sendCommand({ type: 'build-start', kind: opt.id });
+            setView({ kind: 'home' });
+          } else {
+            playShake(panelRef.current?.querySelector(`[data-hotkey="${k}"]`) ?? null);
+          }
+          e.preventDefault();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Key på indre wrapper sørger for at CSS-animasjoner restartes når view skifter.
+  const viewKey = view.kind === 'lane' ? `lane-${view.lane}` : view.kind;
 
   return (
-    <div className="rts-panel rts-command-panel">
-      <div className="rts-section-title">Send soldat</div>
-      <div className="rts-command-grid">
-        {laneButtons.map((b) => (
-          <button
-            key={`lane-${b.lane}`}
-            className={`rts-cmd ${cantSend ? '' : 'affordable'}`}
-            disabled={cantSend}
-            onClick={() => hudBridge.sendCommand({ type: 'send-lane', lane: b.lane })}
-            title={`${b.label} (${laneCost} mat) [${b.key}]`}
-          >
-            <span className="rts-cmd-hotkey">{b.key}</span>
-            <span className="rts-cmd-icon"><AntIcon size={40} kind="soldier" /></span>
-            <span className="rts-cmd-label">{b.label}</span>
-            <span className={`rts-cmd-cost ${cantSend ? 'cant' : ''}`}>{laneCost}</span>
-          </button>
-        ))}
-
-        <div className="rts-cmd rts-cmd-empty" aria-hidden style={{ gridColumn: '1 / -1', height: 6 }} />
-
-        {towers.map((t) => {
-          const cant = s.player.gold < t.cost;
-          const active = buildActive && s.buildMode?.kind === t.type;
-          return (
-            <button
-              key={`tower-${t.type}`}
-              className={`rts-cmd ${cant ? '' : 'affordable'} ${active ? 'active' : ''}`}
-              disabled={cant && !active}
-              onClick={() => hudBridge.sendCommand({ type: 'build-start', kind: t.type })}
-              title={`${t.label}-tårn (${t.cost} mat) [${t.key}]`}
-            >
-              <span className="rts-cmd-hotkey">{t.key}</span>
-              <span className="rts-cmd-icon"><TowerIcon size={40} kind={t.type} /></span>
-              <span className="rts-cmd-label">{t.label}</span>
-              <span className={`rts-cmd-cost ${cant ? 'cant' : ''}`}>{t.cost}</span>
-            </button>
-          );
-        })}
-
-        {buildActive && (
-          <button
-            className="rts-cmd"
-            onClick={() => hudBridge.sendCommand({ type: 'build-cancel' })}
-            title="Avbryt bygg-modus [Esc]"
-          >
-            <span className="rts-cmd-hotkey">Esc</span>
-            <span className="rts-cmd-icon" style={{ fontSize: 30 }}>✕</span>
-            <span className="rts-cmd-label">Avbryt</span>
-          </button>
+    <div className="rts-panel rts-lane-stack" ref={panelRef} data-view={view.kind}>
+      <div key={viewKey} className={`rts-stack-view rts-view-${view.kind}`}>
+        {view.kind === 'home' && (
+          <HomeView s={s} onPickLane={(lane) => setView({ kind: 'lane', lane })} onPickBuild={() => setView({ kind: 'build' })} buildActive={buildActive} />
+        )}
+        {view.kind === 'lane' && (
+          <LaneView s={s} lane={view.lane} onBack={() => setView({ kind: 'home' })} />
+        )}
+        {view.kind === 'build' && (
+          <BuildView s={s} onBack={() => setView({ kind: 'home' })} onPicked={() => setView({ kind: 'home' })} buildActive={buildActive} />
         )}
       </div>
     </div>
+  );
+}
+
+function HomeView({ s, onPickLane, onPickBuild, buildActive }: {
+  s: HudState;
+  onPickLane: (lane: 0 | 1 | 2) => void;
+  onPickBuild: () => void;
+  buildActive: boolean;
+}) {
+  const laneCost = s.costs.soldier;
+  const cantAfford = s.player.gold < laneCost;
+  const soldierCounts = countSoldiersPerLane(s);
+
+  return (
+    <>
+      <div className="rts-section-title">Lanes</div>
+      <div className="rts-lane-buttons">
+        {LANE_META.map((meta, i) => (
+          <button
+            key={`lane-${meta.lane}`}
+            className={`rts-lane-button ${cantAfford ? '' : 'affordable'}`}
+            style={{ ['--i' as string]: i }}
+            onClick={() => onPickLane(meta.lane)}
+            title={`Åpne ${meta.label}-lane meny [${meta.hotkey}]`}
+          >
+            <span className="rts-lane-hotkey">{meta.hotkey}</span>
+            <span className="rts-lane-arrow">{meta.arrow}</span>
+            <span className="rts-lane-name">{meta.label}-lane</span>
+            <span className="rts-lane-count" title="Egne soldater på lanen">
+              <AntIcon size={14} kind="soldier" /> {soldierCounts[meta.lane]}
+            </span>
+          </button>
+        ))}
+      </div>
+      <button
+        className={`rts-build-button ${buildActive ? 'active' : ''}`}
+        style={{ ['--i' as string]: 3 }}
+        onClick={onPickBuild}
+        title="Åpne bygg-meny [B]"
+      >
+        <span className="rts-lane-hotkey">B</span>
+        <span className="rts-build-hammer">⚒</span>
+        <span className="rts-lane-name">Bygg</span>
+        <span className="rts-lane-count" title="Tårn bygget">{s.stats.playerTowers}</span>
+      </button>
+    </>
+  );
+}
+
+function LaneView({ s, lane, onBack }: { s: HudState; lane: 0 | 1 | 2; onBack: () => void }) {
+  const meta = LANE_META[lane];
+  return (
+    <>
+      <button className="rts-menu-header" onClick={onBack} title="Tilbake [Esc]">
+        <span className="rts-menu-back">‹</span>
+        <span className="rts-menu-header-title">
+          <span className="rts-lane-hotkey inline">{meta.hotkey}</span>
+          {meta.label}-lane <span className="rts-lane-arrow tiny">{meta.arrow}</span>
+        </span>
+        <span className="rts-menu-hint">Esc</span>
+      </button>
+      <div className="rts-menu-grid">
+        {LANE_OPTIONS.map((opt, i) => {
+          const cost = opt.costFromState(s);
+          const cant = s.player.gold < cost;
+          return (
+            <MenuOption
+              key={opt.id}
+              index={i}
+              hotkey={opt.hotkey}
+              label={opt.label}
+              cost={cost}
+              enabled={true}
+              canAfford={!cant}
+              icon={opt.icon(38)}
+              describe={opt.describe}
+              onActivate={() => hudBridge.sendCommand(opt.toCommand(lane))}
+            />
+          );
+        })}
+      </div>
+      <div className="rts-menu-foot">Trykk tallet for å sende · Esc tilbake</div>
+    </>
+  );
+}
+
+function BuildView({ s, onBack, onPicked, buildActive }: {
+  s: HudState;
+  onBack: () => void;
+  onPicked: () => void;
+  buildActive: boolean;
+}) {
+  return (
+    <>
+      <button className="rts-menu-header" onClick={onBack} title="Tilbake [Esc]">
+        <span className="rts-menu-back">‹</span>
+        <span className="rts-menu-header-title">
+          <span className="rts-lane-hotkey inline">B</span>
+          Bygg <span className="rts-build-hammer tiny">⚒</span>
+        </span>
+        <span className="rts-menu-hint">Esc</span>
+      </button>
+      <div className="rts-menu-grid two-col">
+        {BUILD_OPTIONS.map((opt, i) => {
+          const cant = s.player.gold < opt.cost;
+          const active = buildActive && s.buildMode?.kind === opt.id;
+          const icon = opt.category === 'tower'
+            ? <TowerIcon size={38} kind={opt.id as TowerKind} />
+            : <span className="rts-build-glyph">{opt.id === 'farm' ? '🌱' : opt.id === 'wall' ? '🧱' : '⚙'}</span>;
+          return (
+            <MenuOption
+              key={opt.id}
+              index={i}
+              hotkey={opt.hotkey}
+              label={opt.label}
+              cost={opt.cost}
+              enabled={opt.enabled}
+              canAfford={!cant}
+              active={active}
+              icon={icon}
+              describe={opt.describe}
+              onActivate={() => {
+                hudBridge.sendCommand({ type: 'build-start', kind: opt.id });
+                onPicked();
+              }}
+            />
+          );
+        })}
+      </div>
+      <div className="rts-menu-foot">Trykk 1-6 for å velge · Esc tilbake</div>
+    </>
+  );
+}
+
+function MenuOption({ index, hotkey, label, cost, enabled, canAfford, active, icon, describe, onActivate }: {
+  index: number;
+  hotkey: string;
+  label: string;
+  cost: number;
+  enabled: boolean;
+  canAfford: boolean;
+  active?: boolean;
+  icon: React.ReactNode;
+  describe: string;
+  onActivate: () => void;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const disabled = !enabled || !canAfford;
+  const className = [
+    'rts-menu-option',
+    enabled ? '' : 'soon',
+    !canAfford && enabled ? 'cant-afford' : '',
+    canAfford && enabled ? 'affordable' : '',
+    active ? 'active' : '',
+  ].filter(Boolean).join(' ');
+
+  const handle = () => {
+    if (disabled) {
+      playShake(ref.current);
+      return;
+    }
+    onActivate();
+  };
+
+  return (
+    <button
+      ref={ref}
+      className={className}
+      data-hotkey={hotkey}
+      style={{ ['--i' as string]: index }}
+      onClick={handle}
+      title={`${label} — ${describe} (${cost} mat) [${hotkey}]`}
+    >
+      <span className="rts-menu-option-hotkey">{hotkey}</span>
+      <span className="rts-menu-option-icon">{icon}</span>
+      <span className="rts-menu-option-label">{label}</span>
+      <span className={`rts-menu-option-cost ${!canAfford && enabled ? 'cant' : ''}`}>{cost}</span>
+      {!enabled && <span className="rts-menu-option-soon">snart</span>}
+    </button>
   );
 }
 
@@ -467,18 +755,20 @@ function GameOver({ s }: { s: HudState }) {
 
 const HOTKEYS: Array<{ section: string; keys: Array<[string, string]> }> = [
   {
-    section: 'Send soldater',
+    section: 'Lane-menyer',
     keys: [
-      ['Q', 'Send soldat i Nord-lane'],
-      ['R', 'Send soldat i Midt-lane'],
-      ['E', 'Send soldat i Sør-lane'],
+      ['1', 'Åpne Nord-lane meny'],
+      ['2', 'Åpne Midt-lane meny'],
+      ['3', 'Åpne Sør-lane meny'],
+      ['1-6 (i meny)', 'Velg enhet å sende'],
+      ['Esc', 'Tilbake til lane-oversikt'],
     ],
   },
   {
-    section: 'Tårn-bygg',
+    section: 'Bygg',
     keys: [
-      ['T', 'Toggle bygg-modus (Spydd-tårn)'],
-      ['1 / 2 / 3', 'Bytt til Spydd / Nett / Spytt (i bygg-modus)'],
+      ['B', 'Åpne bygg-meny (tårn + bygninger)'],
+      ['1-6 (i meny)', 'Velg bygg-type'],
       ['Venstreklikk', 'Plasser tårn (utenfor lane-bånd)'],
       ['Shift+klikk', 'Plasser flere uten å gå ut av bygg-modus'],
       ['Esc / Høyreklikk', 'Avbryt bygg-modus'],
@@ -602,7 +892,7 @@ function BuildModeBanner({ s }: { s: HudState }) {
       <div className="rts-build-info">
         <div className="rts-build-title">Plasserer {labels[kind] ?? kind} — {s.buildMode.cost} mat</div>
         <div className="rts-build-hint">
-          1/2/3 = bytt tårn-type · venstreklikk plasserer (utenfor lane-bånd) · Shift+klikk for flere · Esc avbryter
+          Venstreklikk plasserer (utenfor lane-bånd) · Shift+klikk for flere · Esc avbryter
         </div>
       </div>
       <button
@@ -651,7 +941,7 @@ export function HudOverlay() {
       <AlertBanner s={state} />
       <BuildModeBanner s={state} />
       <Minimap s={state} />
-      <CommandCard s={state} />
+      <LaneCommandStack s={state} />
       <GameOver s={state} />
       <button
         className="rts-help-fab"

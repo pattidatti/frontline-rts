@@ -14,11 +14,11 @@ const STEPS: Step[] = [
   },
   {
     title: 'Send soldater i en lane',
-    body: 'I høyrepanelet ser du 3 knapper: Nord, Midt og Sør. Hver knapp koster mat og spawner én soldat ved basen din som marsjerer østover i den lanen. Soldater er låst til sin lane — så velg klokt hvor fienden er sterkest. Hurtigtaster: Q = Nord, R = Midt, E = Sør.',
+    body: 'I høyrepanelet ser du 3 lane-knapper (Nord, Midt, Sør) — én per kampgang. Trykk 1, 2 eller 3 (eller klikk knappen) for å åpne menyen for den lanen. I menyen velger du enhetstype med tallet ved siden av (1 = Soldat). Soldater er låst til sin lane — så velg klokt hvor fienden er sterkest. Esc tar deg tilbake.',
   },
   {
     title: 'Bygg tårn utenfor lanene',
-    body: 'Klikk Spydd / Nett / Spytt (eller trykk T) for å gå inn i bygg-modus. Venstreklikk på gress UTENFOR lane-bånd for å plassere et tårn — tårn skyter på creeps som passerer forbi. Spydd = single-target, Nett = slow, Spytt = splash. Shift+klikk for å plassere flere. Esc avbryter.',
+    body: 'Trykk B (eller klikk Bygg-knappen) for å åpne bygg-menyen. Velg Spydd (1), Nett (2) eller Spytt (3). Venstreklikk på gress UTENFOR lane-bånd for å plassere et tårn — tårn skyter på creeps som passerer forbi. Spydd = single-target, Nett = slow, Spytt = splash. Shift+klikk for å plassere flere. Esc avbryter.',
   },
   {
     title: 'Forbered deg mellom bølger',

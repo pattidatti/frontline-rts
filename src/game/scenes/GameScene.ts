@@ -248,20 +248,8 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-MINUS',         () => this.cycleSpeed(-1));
     this.input.keyboard?.on('keydown-NUMPAD_SUBTRACT', () => this.cycleSpeed(-1));
 
-    // Tower-bygging hotkeys
-    this.input.keyboard?.on('keydown-T', () => {
-      if (this.buildMode) this.cancelBuildMode();
-      else this.startBuildMode('stinger');
-    });
-    this.input.keyboard?.on('keydown-ONE',   () => { if (this.buildMode) this.startBuildMode('stinger'); });
-    this.input.keyboard?.on('keydown-TWO',   () => { if (this.buildMode) this.startBuildMode('webber');  });
-    this.input.keyboard?.on('keydown-THREE', () => { if (this.buildMode) this.startBuildMode('spitter'); });
-
-    // Lane-spawn hotkeys (Q/W/E mapper til lane 0/1/2)
-    this.input.keyboard?.on('keydown-Q', () => this.sendLaneSoldier(0));
-    this.input.keyboard?.on('keydown-W', () => { /* W brukes til kamera-scroll i tillegg — ignorer her */ });
-    this.input.keyboard?.on('keydown-E', () => this.sendLaneSoldier(2));
-    this.input.keyboard?.on('keydown-R', () => this.sendLaneSoldier(1));
+    // Tårn-bygg og lane-soldater eies nå av HUD-en (LaneCommandStack).
+    // Scene har bare Esc=cancel-build (registrert lenger opp) som backup.
 
     // Klar-knapp (skip prep)
     this.input.keyboard?.on('keydown-G', () => this.waveManager.skipPrep());
