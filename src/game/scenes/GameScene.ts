@@ -223,7 +223,22 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', this.onPointerDown, this);
     this.input.on('pointermove', this.onPointerMove, this);
 
-    this.input.keyboard?.on('keydown-SPACE', (e: KeyboardEvent) => { e.preventDefault(); this.togglePause(); });
+    // Svelg den aller første SPACE som når GameScene. MenuScene starter spillet
+    // via SPACE/Enter; hvis spilleren trykker Space-Space (start + vane), ville
+    // andre Space ellers umiddelbart pause det nyoppstartede spillet. Bruker en
+    // tidsterskel på 1500ms i tillegg så bare det første "vane-trykket" svelges,
+    // ikke et bevisst pause-trykk gjort senere.
+    let firstSpaceSwallowed = false;
+    const sceneStartWall = Date.now();
+    this.input.keyboard?.on('keydown-SPACE', (e: KeyboardEvent) => {
+      e.preventDefault();
+      if (!firstSpaceSwallowed && Date.now() - sceneStartWall < 1500) {
+        firstSpaceSwallowed = true;
+        return;
+      }
+      firstSpaceSwallowed = true;
+      this.togglePause();
+    });
     this.input.keyboard?.on('keydown-ESC', () => {
       if (this.buildMode) this.cancelBuildMode();
     });
@@ -275,7 +290,9 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.cameras.main.setBounds(0, 0, W, H);
-    this.cameras.main.centerOn(W / 2, H / 2);
+    // Sentrér på player-base og litt østover — viewport viser basen og det første
+    // angreps-vinduet før spilleren må panorere mot fiende-spawnere i øst.
+    this.cameras.main.centerOn(CONFIG.PLAYER_BASE_X + 480, H / 2);
 
     // Timers — passiv income + metrics
     this.time.addEvent({ delay: CONFIG.MINE_TICK_INTERVAL, callback: this.passiveIncomeTick, callbackScope: this, loop: true });
@@ -303,26 +320,63 @@ export class GameScene extends Phaser.Scene {
     const W = CONFIG.MAP_WIDTH;
     const g = this.add.graphics().setDepth(1);
     for (const lane of this.lanes) {
-      // Jordveg-bånd langs lanen (lysere enn gresset)
-      g.fillStyle(0x5a4a2c, 0.42);
+      // Jordveg-bånd langs lanen — kraftigere kontrast mot gresset så lanen leses som "vei".
+      g.fillStyle(0x5a4226, 0.7);
       g.fillRect(0, lane.y - lane.halfHeight, W, lane.halfHeight * 2);
-      // Lane-grenser (subtile linjer)
-      g.lineStyle(2, 0x2a1f12, 0.45);
+      // Lysere kant inn mot midten av lanen (gradient-illusjon i to lag)
+      g.fillStyle(0x6b5230, 0.35);
+      g.fillRect(0, lane.y - lane.halfHeight * 0.85, W, lane.halfHeight * 1.7);
+      // Lane-grenser — markante mørke kanter
+      g.lineStyle(3, 0x1a0f06, 0.85);
       g.lineBetween(0, lane.y - lane.halfHeight, W, lane.y - lane.halfHeight);
       g.lineBetween(0, lane.y + lane.halfHeight, W, lane.y + lane.halfHeight);
-      // Senterlinje (stiplet, dempet)
-      g.lineStyle(1, 0xddcc88, 0.18);
-      for (let x = 20; x < W; x += 40) {
-        g.lineBetween(x, lane.y, x + 18, lane.y);
+      // Indre highlight-linje langs lane-kanten (subtilt lys ovenfra)
+      g.lineStyle(1, 0xddcc88, 0.25);
+      g.lineBetween(0, lane.y - lane.halfHeight + 2, W, lane.y - lane.halfHeight + 2);
+      // Senterlinje — stiplet, tydeligere
+      g.lineStyle(1.5, 0xeed588, 0.32);
+      for (let x = 20; x < W; x += 50) {
+        g.lineBetween(x, lane.y, x + 24, lane.y);
       }
-      // Lane-etikett (vest, ved player-base)
-      this.add.text(CONFIG.PLAYER_BASE_X - 60, lane.y - 30, lane.label, {
+
+      // Retnings-piler langs lanen — peker fra player-base (vest) mot fiende-spawner (øst).
+      // Plasseres mellom basen og spawneren med jevne mellomrom så spilleren leser
+      // "soldater går denne veien".
+      const arrowStartX = CONFIG.PLAYER_BASE_X + 280;
+      const arrowEndX = CONFIG.ENEMY_SPAWN_X - 280;
+      const arrowSpacing = 320;
+      for (let ax = arrowStartX; ax < arrowEndX; ax += arrowSpacing) {
+        this.drawLaneArrow(g, ax, lane.y, 1);   // grønn pil — player-retning
+      }
+      // Speil: røde piler fra øst peker mot vest (creep-retning) — tegnet litt forskjøvet
+      // så de ikke overlapper de grønne.
+      for (let ax = arrowStartX + arrowSpacing / 2; ax < arrowEndX; ax += arrowSpacing) {
+        this.drawLaneArrow(g, ax, lane.y, -1);   // rød pil — creep-retning
+      }
+
+      // Lane-etikett — i vest-kanten, vertikalt sentrert i lane-bandet, slik at den
+      // ikke overlapper med player-basen midt i lanen.
+      this.add.text(28, lane.y, lane.label, {
         fontFamily: 'sans-serif',
-        fontSize: '20px',
-        color: '#ddcc88',
+        fontSize: '22px',
+        color: '#ffeaa0',
         fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(2).setAlpha(0.75);
+      }).setOrigin(0, 0.5).setDepth(2).setAlpha(0.9).setShadow(0, 2, '#000', 4, true, true);
     }
+  }
+
+  /** Tegner en chevron-pil på lane-senterlinje. dir=1 peker øst, dir=-1 peker vest. */
+  private drawLaneArrow(g: Phaser.GameObjects.Graphics, x: number, y: number, dir: 1 | -1) {
+    const len = 22;
+    const wing = 12;
+    const color = dir === 1 ? 0x88dd66 : 0xee6644;
+    g.lineStyle(3, color, 0.45);
+    // Chevron: to streker som møtes i tuppen (x + dir*len/2)
+    g.beginPath();
+    g.moveTo(x - dir * len / 2, y - wing);
+    g.lineTo(x + dir * len / 2, y);
+    g.lineTo(x - dir * len / 2, y + wing);
+    g.strokePath();
   }
 
   private applyCameraFX() {
