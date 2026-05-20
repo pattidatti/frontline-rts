@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const STORAGE_KEY = 'frontline_tutorial_done';
+const STORAGE_KEY = 'frontline_tutorial_td_done';
 
 interface Step {
   title: string;
@@ -10,23 +10,23 @@ interface Step {
 const STEPS: Step[] = [
   {
     title: 'Velkommen, Maur-konge!',
-    body: 'Du styrer den mørke kolonien i sør. Målet er å rive fiendens maurtue i nord. Panorér kameraet med WASD eller piltaster — eller klikk på Slagmark-minimapet nede til venstre. Trykk H når som helst for å se alle hurtigtaster.',
+    body: 'Kolonien din ligger i vest. I øst rykker fiendebølger fram langs 3 lanes (Nord, Midt, Sør). Hold maurtua di i live i 15 bølger — så vinner du. Panorér kameraet med WASD eller piltaster, eller klikk på Slagmark-minimapet. Trykk H når som helst for alle hurtigtaster.',
   },
   {
-    title: 'Bladlusfarm = mat',
-    body: 'Velg en arbeider og høyreklikk på en Bladlusfarm. Arbeideren stiller seg i farmen og gir deg mat så lenge hun står der — trekk hun ut og minen stopper. Tren flere arbeidere med Q fra maurtua (25 mat hver), så får du mat fra flere farmer samtidig.',
+    title: 'Send soldater i en lane',
+    body: 'I høyrepanelet ser du 3 knapper: Nord, Midt og Sør. Hver knapp koster mat og spawner én soldat ved basen din som marsjerer østover i den lanen. Soldater er låst til sin lane — så velg klokt hvor fienden er sterkest. Hurtigtaster: Q = Nord, R = Midt, E = Sør.',
   },
   {
-    title: 'Bygg barakke & tren soldater',
-    body: 'Først må du bygge en barakke: trykk 4 (eller klikk Barakke-knappen) → venstreklikk et sted nær basen → en arbeider bygger den. Etterpå: trykk E ved barakka for å trene en soldat (50 mat). Bruk Z for å velge alle soldater, X for alle arbeidere.',
+    title: 'Bygg tårn utenfor lanene',
+    body: 'Klikk Spydd / Nett / Spytt (eller trykk T) for å gå inn i bygg-modus. Venstreklikk på gress UTENFOR lane-bånd for å plassere et tårn — tårn skyter på creeps som passerer forbi. Spydd = single-target, Nett = slow, Spytt = splash. Shift+klikk for å plassere flere. Esc avbryter.',
   },
   {
-    title: 'Tårn, murer & forsvar',
-    body: 'Når økonomien går: bygg tårn (1=Spydd, 2=Nett, 3=Spytt) nær basen. Bruk farm (5), mur (6) og smie (7) til å snowballe. Velg maurtua og trykk V (eller klikk Forsvar) for å gjøre selve tua til et tårn. Alt bygges av en arbeider — hold minst 2–3 i mining til enhver tid.',
+    title: 'Forbered deg mellom bølger',
+    body: 'Mellom hver bølge har du en kort pause med countdown. Bruk den til å bygge tårn og samle opp mat. Når du føler deg klar: trykk G eller klikk "Klar!" for å starte neste bølge med en gang. Du får passiv mat-inntekt + ekstra mat per drept fiende.',
   },
   {
-    title: 'Kryss elva & ta platåene',
-    body: 'Elven splitter kartet — maur kan ikke svømme, så broene er kritiske passasjer. Send soldater nord; de finner broa automatisk. Det høye landet har ramper du må bruke for å komme opp. Hold de kontesta minene midt på kartet for å sulte fienden ut!',
+    title: 'Pass på basen!',
+    body: 'Hvis en creep når basen din, mister du HP. Når HP når 0 — game over. Senere bølger har tank- og boss-fiender (større, sterkere) — disse gir mer mat når du dreper dem, men er vanskelige å stoppe. Bruk Nett-tårn til å bremse dem, Spydd til høy single-target damage, og soldater til å blokkere veien.',
   },
 ];
 
