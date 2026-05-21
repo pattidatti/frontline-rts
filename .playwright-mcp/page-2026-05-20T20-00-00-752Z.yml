@@ -1,0 +1,85 @@
+- generic [ref=e3]:
+  - generic:
+    - generic [ref=e22]:
+      - generic [ref=e23]: Frontline TD
+      - button "▶ 1×" [ref=e24] [cursor=pointer]
+      - generic [ref=e25]:
+        - img [ref=e27]
+        - generic [ref=e32]:
+          - generic [ref=e33]: "250"
+          - generic [ref=e34]: Mat
+      - generic [ref=e36]:
+        - img [ref=e38]
+        - generic [ref=e50]:
+          - generic [ref=e51]: "0"
+          - generic [ref=e52]: På lanene
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - img [ref=e56]
+          - generic [ref=e62]:
+            - generic [ref=e63]: "500"
+            - generic [ref=e64]: Maurtue 100%
+        - generic [ref=e65]:
+          - img [ref=e67]
+          - generic [ref=e73]:
+            - generic [ref=e74]: "500"
+            - generic [ref=e75]: Fiendebase 100%
+        - generic [ref=e76]:
+          - img [ref=e78]
+          - generic [ref=e90]:
+            - generic [ref=e91]: "0"
+            - generic [ref=e92]: Fiender igjen
+      - generic "Volum 60 %" [ref=e94]:
+        - button "🔉" [ref=e95] [cursor=pointer]
+        - slider [ref=e96] [cursor=pointer]: "0.6"
+      - generic [ref=e98]: ⏱ 0:00
+    - generic [ref=e99]:
+      - generic [ref=e100]: Tårn
+      - generic [ref=e101]:
+        - button "Q Spydd 80" [ref=e102] [cursor=pointer]:
+          - generic [ref=e103]: Q
+          - img [ref=e105]
+          - generic [ref=e111]: Spydd
+          - generic [ref=e112]:
+            - img [ref=e113]
+            - text: "80"
+        - button "W Nett 100" [ref=e118] [cursor=pointer]:
+          - generic [ref=e119]: W
+          - img [ref=e121]
+          - generic [ref=e127]: Nett
+          - generic [ref=e128]:
+            - img [ref=e129]
+            - text: "100"
+        - button "E Spytt 120" [ref=e134] [cursor=pointer]:
+          - generic [ref=e135]: E
+          - img [ref=e137]
+          - generic [ref=e143]: Spytt
+          - generic [ref=e144]:
+            - img [ref=e145]
+            - text: "120"
+    - button "2 Midt 0" [ref=e151] [cursor=pointer]:
+      - generic [ref=e152]: "2"
+      - generic [ref=e153]: Midt
+      - generic [ref=e154]:
+        - img [ref=e155]
+        - text: "0"
+    - dialog [ref=e167]:
+      - generic [ref=e168]:
+        - generic [ref=e169]: Klar for neste runde
+        - generic [ref=e170]:
+          - text: Bølge 1
+          - generic [ref=e171]: / 15
+        - generic [ref=e172]:
+          - generic [ref=e173]:
+            - strong [ref=e174]: "4"
+            - text: maur
+          - generic [ref=e175]: "Lane: Midt"
+        - button "▶ Start bølge G" [active] [ref=e176] [cursor=pointer]:
+          - text: ▶ Start bølge
+          - generic [ref=e177]: G
+        - generic [ref=e178]:
+          - text: Du kan bare bygge og sende soldater
+          - emphasis [ref=e179]: etter
+          - text: at bølgen er i gang.
+          - text: Begge sider starter samtidig.
+    - button "?" [ref=e180] [cursor=pointer]

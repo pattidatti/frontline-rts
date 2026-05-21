@@ -1,0 +1,122 @@
+- generic [ref=e3]:
+  - generic:
+    - generic [ref=e22]:
+      - generic [ref=e23]: Frontline RTS
+      - button "▶ 1×" [ref=e24] [cursor=pointer]
+      - generic [ref=e25]:
+        - img [ref=e27]
+        - generic [ref=e33]:
+          - generic [ref=e34]: "35"
+          - generic [ref=e35]: Mat
+      - generic [ref=e37]:
+        - img [ref=e39]
+        - generic [ref=e57]:
+          - generic [ref=e58]: "10"
+          - generic [ref=e59]: Soldater
+      - generic [ref=e60]:
+        - img [ref=e62]
+        - generic [ref=e77]:
+          - generic [ref=e78]: "3"
+          - generic [ref=e79]: Arbeidere
+      - generic [ref=e80]:
+        - generic [ref=e81]:
+          - img [ref=e83]
+          - generic [ref=e89]:
+            - generic [ref=e90]: "500"
+            - generic [ref=e91]: Fiende-tue
+        - generic [ref=e92]:
+          - img [ref=e94]
+          - generic [ref=e112]:
+            - generic [ref=e113]: "9"
+            - generic [ref=e114]: Fiendesold
+      - generic "Volum 60 %" [ref=e116]:
+        - button "Mute" [ref=e117] [cursor=pointer]: 🔉
+        - slider "Volum" [ref=e118] [cursor=pointer]: "0.6"
+      - generic [ref=e120]: ⏱ 1:43
+    - generic [ref=e121]:
+      - generic [ref=e122]: Slagmark
+      - img [ref=e124]
+    - generic [ref=e138]:
+      - generic [ref=e139]: Kommandoer
+      - generic [ref=e140]:
+        - button "1 Spydd 80" [disabled] [ref=e145]:
+          - generic [ref=e146]: "1"
+          - img [ref=e148]
+          - generic [ref=e154]: Spydd
+          - generic [ref=e155]: "80"
+        - button "2 Nett 100" [disabled] [ref=e156]:
+          - generic [ref=e157]: "2"
+          - img [ref=e159]
+          - generic [ref=e165]: Nett
+          - generic [ref=e166]: "100"
+        - button "3 Spytt 120" [disabled] [ref=e167]:
+          - generic [ref=e168]: "3"
+          - img [ref=e170]
+          - generic [ref=e176]: Spytt
+          - generic [ref=e177]: "120"
+        - button "4 Barakke 80" [disabled] [ref=e178]:
+          - generic [ref=e179]: "4"
+          - img [ref=e181]
+          - generic [ref=e187]: Barakke
+          - generic [ref=e188]: "80"
+        - button "5 Avlsfarm 60" [disabled] [ref=e189]:
+          - generic [ref=e190]: "5"
+          - img [ref=e192]
+          - generic [ref=e198]: Avlsfarm
+          - generic [ref=e199]: "60"
+        - button "6 Mur 20" [ref=e200] [cursor=pointer]:
+          - generic [ref=e201]: "6"
+          - img [ref=e203]
+          - generic [ref=e207]: Mur
+          - generic [ref=e208]: "20"
+        - button "7 Vpn.kammer 100" [disabled] [ref=e209]:
+          - generic [ref=e210]: "7"
+          - img [ref=e212]
+          - generic [ref=e219]: Vpn.kammer
+          - generic [ref=e220]: "100"
+        - button "Esc ✕ Rydd" [ref=e221] [cursor=pointer]:
+          - generic [ref=e222]: Esc
+          - generic [ref=e224]: ✕
+          - generic [ref=e225]: Rydd
+    - generic [ref=e255]:
+      - generic [ref=e256]: TAPT
+      - generic [ref=e257]:
+        - generic [ref=e258]:
+          - generic [ref=e259]: Tid
+          - strong [ref=e260]: 1:43
+        - generic [ref=e261]:
+          - generic [ref=e262]: Soldater trent
+          - strong [ref=e263]: "0"
+        - generic [ref=e264]:
+          - generic [ref=e265]: Arbeidere trent
+          - strong [ref=e266]: "0"
+        - generic [ref=e267]:
+          - generic [ref=e268]: Mat samlet
+          - strong [ref=e269]: "865"
+        - generic [ref=e270]:
+          - generic [ref=e271]: Fiende-drap
+          - strong [ref=e272]: "10"
+        - generic [ref=e273]:
+          - generic [ref=e274]: Egne tap
+          - strong [ref=e275]: "5"
+        - generic [ref=e276]:
+          - generic [ref=e277]: Maks miner holdt
+          - strong [ref=e278]: "2"
+        - generic [ref=e279]:
+          - generic [ref=e280]: Tårn bygget
+          - strong [ref=e281]: "0"
+      - generic [ref=e282]:
+        - button "↻ Spill igjen R" [ref=e283] [cursor=pointer]:
+          - text: ↻ Spill igjen
+          - generic [ref=e284]: R
+        - button "Til hovedmeny" [ref=e285] [cursor=pointer]
+    - button "Vis hurtigtaster" [ref=e226] [cursor=pointer]: "?"
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]: Trinn 1 / 5
+      - button "Hopp over tutorial" [ref=e10] [cursor=pointer]: Hopp over
+    - generic [ref=e11]: Velkommen, Maur-konge!
+    - generic [ref=e12]: Du styrer den mørke kolonien i sør. Målet er å rive fiendens maurtue i nord. Panorér kameraet med WASD eller piltaster — eller klikk på Slagmark-minimapet nede til venstre. Trykk H når som helst for å se alle hurtigtaster.
+    - generic [ref=e13]:
+      - button "Forrige" [disabled] [ref=e14] [cursor=pointer]
+      - button "Neste" [ref=e21] [cursor=pointer]

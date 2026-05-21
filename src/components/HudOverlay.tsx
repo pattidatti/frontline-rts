@@ -1,55 +1,157 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { hudBridge, type HudState, type TowerKind, type BuildKind } from '../game/hudBridge';
+import { useEffect, useState, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
+import { hudBridge, type HudState, type TowerKind, type HudUpgradeRarity } from '../game/hudBridge';
 import { getVolume, setVolume, onVolumeChange } from '../game/audio';
-import { CONFIG } from '../game/config';
+import { CONFIG, type UnitKind } from '../game/config';
 import './HudOverlay.css';
 
-// ── SVG icons (tiny, theme-matched) ─────────────────────────────────────
+// ── SVG icons ───────────────────────────────────────────────────────────
 
-function AntIcon({ size = 22, faction = 'player', kind = 'worker' }: {
-  size?: number; faction?: 'player' | 'ai'; kind?: 'worker' | 'soldier';
+function AntIcon({ size = 22, faction = 'player', kind = 'medium' }: {
+  size?: number; faction?: 'player' | 'ai'; kind?: UnitKind;
 }) {
+  if (kind === 'medium') return <LarvaIcon size={size} faction={faction} />;
+  if (kind === 'heavy') return <BumblebeeIcon size={size} faction={faction} />;
+  if (kind === 'wasp') return <WaspIcon size={size} faction={faction} />;
+  if (kind === 'termite') return <TermiteIcon size={size} faction={faction} />;
+
+  // Light + sumo + fallback: vanlig maur.
   const body = faction === 'player' ? '#1a1a1a' : '#7a2a14';
   const highlight = faction === 'player' ? '#3a3a3a' : '#a04428';
   const mandible = faction === 'player' ? '#d8c8a0' : '#e8b078';
+  const scale = kind === 'light' ? 0.85 : kind === 'sumo' ? 1.4 : 1.0;
   return (
     <svg width={size} height={size} viewBox="0 0 32 32">
-      {/* legs */}
-      <g stroke={body} strokeWidth="1.2" strokeLinecap="round">
-        <line x1="13" y1="16" x2="6" y2="11" />
-        <line x1="13" y1="16" x2="5" y2="16" />
-        <line x1="13" y1="16" x2="6" y2="22" />
-        <line x1="19" y1="16" x2="26" y2="11" />
-        <line x1="19" y1="16" x2="27" y2="16" />
-        <line x1="19" y1="16" x2="26" y2="22" />
-      </g>
-      {/* abdomen */}
-      <ellipse cx="22" cy="16" rx="6" ry="4.5" fill={body} />
-      <ellipse cx="21" cy="14.5" rx="2.5" ry="1.2" fill={highlight} opacity="0.65" />
-      {/* thorax */}
-      <ellipse cx="15" cy="16" rx="3.2" ry="2.8" fill={body} />
-      {/* head */}
-      <ellipse cx="9" cy="16" rx="3.5" ry="3" fill={body} />
-      <ellipse cx="8.5" cy="15" rx="1.4" ry="1" fill={highlight} opacity="0.7" />
-      {/* mandibles */}
-      <line x1="6" y1="15" x2="3.5" y2="13.5" stroke={mandible} strokeWidth="1" strokeLinecap="round" />
-      <line x1="6" y1="17" x2="3.5" y2="18.5" stroke={mandible} strokeWidth="1" strokeLinecap="round" />
-      {/* antennae */}
-      <path d="M 8 13 Q 5 9 7 6" stroke={body} strokeWidth="1" fill="none" strokeLinecap="round" />
-      <path d="M 10 13 Q 9 8 11 6" stroke={body} strokeWidth="1" fill="none" strokeLinecap="round" />
-      {/* soldier carries a small sword */}
-      {kind === 'soldier' && (
-        <g>
-          <line x1="22" y1="9" x2="28" y2="3" stroke="#c8c8d0" strokeWidth="1.6" strokeLinecap="round" />
-          <line x1="21" y1="10" x2="23" y2="8" stroke="#b8945a" strokeWidth="1.4" strokeLinecap="round" />
+      <g transform={`translate(16 16) scale(${scale}) translate(-16 -16)`}>
+        <g stroke={body} strokeWidth="1.2" strokeLinecap="round">
+          <line x1="13" y1="16" x2="6" y2="11" />
+          <line x1="13" y1="16" x2="5" y2="16" />
+          <line x1="13" y1="16" x2="6" y2="22" />
+          <line x1="19" y1="16" x2="26" y2="11" />
+          <line x1="19" y1="16" x2="27" y2="16" />
+          <line x1="19" y1="16" x2="26" y2="22" />
         </g>
-      )}
+        <ellipse cx="22" cy="16" rx="6" ry="4.5" fill={body} />
+        <ellipse cx="21" cy="14.5" rx="2.5" ry="1.2" fill={highlight} opacity="0.65" />
+        <ellipse cx="15" cy="16" rx="3.2" ry="2.8" fill={body} />
+        <ellipse cx="9" cy="16" rx="3.5" ry="3" fill={body} />
+        <ellipse cx="8.5" cy="15" rx="1.4" ry="1" fill={highlight} opacity="0.7" />
+        <line x1="6" y1="15" x2="3.5" y2="13.5" stroke={mandible} strokeWidth="1" strokeLinecap="round" />
+        <line x1="6" y1="17" x2="3.5" y2="18.5" stroke={mandible} strokeWidth="1" strokeLinecap="round" />
+        <path d="M 8 13 Q 5 9 7 6" stroke={body} strokeWidth="1" fill="none" strokeLinecap="round" />
+        <path d="M 10 13 Q 9 8 11 6" stroke={body} strokeWidth="1" fill="none" strokeLinecap="round" />
+        {kind === 'sumo' && (
+          <g>
+            <ellipse cx="22" cy="17.5" rx="7" ry="5.5" fill={body} />
+            <rect x="15" y="14" width="14" height="2.2" fill="#e8c060" stroke="#7a5a18" strokeWidth="0.5" />
+            <circle cx="22" cy="15.1" r="0.9" fill="#ffd86a" />
+          </g>
+        )}
+      </g>
+    </svg>
+  );
+}
+
+function LarvaIcon({ size = 22, faction = 'player' }: { size?: number; faction?: 'player' | 'ai' }) {
+  const body = faction === 'player' ? '#9ab84a' : '#c88a3a';
+  const rim = faction === 'player' ? '#4a6a20' : '#6a3a14';
+  const sheen = faction === 'player' ? '#d0e89a' : '#f4cc88';
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="22" rx="11" ry="2" fill="#000" opacity="0.32" />
+      <ellipse cx="7"  cy="16" rx="3.4" ry="3"   fill={body} stroke={rim} strokeWidth="0.9" />
+      <ellipse cx="12" cy="16" rx="4.4" ry="4.2" fill={body} stroke={rim} strokeWidth="0.9" />
+      <ellipse cx="18" cy="16" rx="4.6" ry="4.4" fill={body} stroke={rim} strokeWidth="0.9" />
+      <ellipse cx="24" cy="16" rx="3.5" ry="3.2" fill={body} stroke={rim} strokeWidth="0.9" />
+      <ellipse cx="8"  cy="14.6" rx="1.6" ry="0.9" fill={sheen} opacity="0.75" />
+      <ellipse cx="12" cy="14"   rx="2.4" ry="1.0" fill={sheen} opacity="0.75" />
+      <ellipse cx="18" cy="13.7" rx="2.6" ry="1.1" fill={sheen} opacity="0.75" />
+      <ellipse cx="24" cy="14.3" rx="1.7" ry="0.9" fill={sheen} opacity="0.75" />
+      <circle cx="25" cy="15.2" r="0.6" fill="#0a0a0a" />
+      <circle cx="25" cy="16.8" r="0.6" fill="#0a0a0a" />
+    </svg>
+  );
+}
+
+function BumblebeeIcon({ size = 22, faction = 'player' }: { size?: number; faction?: 'player' | 'ai' }) {
+  const body = faction === 'player' ? '#1a1a1a' : '#5a2010';
+  const stripe = faction === 'player' ? '#e8c64a' : '#f0a040';
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="24" rx="11" ry="2" fill="#000" opacity="0.35" />
+      <ellipse cx="11" cy="11" rx="7" ry="4" fill="#f4f8ff" stroke="#88aacc" strokeWidth="0.6" opacity="0.78" />
+      <ellipse cx="11" cy="20" rx="7" ry="4" fill="#f4f8ff" stroke="#88aacc" strokeWidth="0.6" opacity="0.78" />
+      <ellipse cx="14" cy="16" rx="9" ry="7" fill={body} stroke="#000" strokeWidth="0.9" />
+      <ellipse cx="9"    cy="16" rx="1.5" ry="5.5" fill={stripe} />
+      <ellipse cx="14"   cy="16" rx="1.6" ry="6.2" fill={stripe} />
+      <ellipse cx="18.5" cy="16" rx="1.5" ry="5.7" fill={stripe} />
+      <ellipse cx="24" cy="16" rx="4.2" ry="4" fill={body} stroke="#000" strokeWidth="0.85" />
+      <circle cx="25"   cy="14.6" r="0.9" fill="#111" />
+      <circle cx="25"   cy="17.4" r="0.9" fill="#111" />
+      <circle cx="25.3" cy="14.3" r="0.3" fill="#fff" />
+      <circle cx="25.3" cy="17.1" r="0.3" fill="#fff" />
+      <line x1="26" y1="13" x2="29" y2="9"  stroke="#000" strokeWidth="0.9" strokeLinecap="round" />
+      <line x1="26" y1="19" x2="29" y2="23" stroke="#000" strokeWidth="0.9" strokeLinecap="round" />
+      <circle cx="29" cy="9"  r="0.7" fill="#000" />
+      <circle cx="29" cy="23" r="0.7" fill="#000" />
+    </svg>
+  );
+}
+
+function WaspIcon({ size = 22, faction = 'player' }: { size?: number; faction?: 'player' | 'ai' }) {
+  const body = faction === 'player' ? '#181818' : '#5a2010';
+  const stripe = faction === 'player' ? '#ffd83a' : '#ff8030';
+  const wing = '#dde8f4';
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="25" rx="10" ry="1.6" fill="#000" opacity="0.32" />
+      {/* Vinger: smale, spisse, diagonale */}
+      <ellipse cx="11" cy="10" rx="6" ry="3" fill={wing} stroke="#88aacc" strokeWidth="0.5" opacity="0.78"
+        transform="rotate(-18 11 10)" />
+      <ellipse cx="11" cy="22" rx="6" ry="3" fill={wing} stroke="#88aacc" strokeWidth="0.5" opacity="0.78"
+        transform="rotate(18 11 22)" />
+      {/* Slankt abdomen + thorax */}
+      <ellipse cx="13" cy="16" rx="5" ry="3.6" fill={body} stroke="#000" strokeWidth="0.8" />
+      <rect x="9" y="14.3" width="8" height="1.4" fill={stripe} />
+      <rect x="9" y="16.3" width="8" height="1.4" fill={stripe} />
+      {/* Spiss "kniv"-abdomen-snabel bak */}
+      <polygon points="4,16 8,14.5 8,17.5" fill={body} stroke="#000" strokeWidth="0.6" />
+      {/* Hode */}
+      <ellipse cx="22" cy="16" rx="3.8" ry="3.4" fill={body} stroke="#000" strokeWidth="0.8" />
+      <circle cx="23" cy="14.8" r="0.8" fill="#fff" />
+      <circle cx="23" cy="17.2" r="0.8" fill="#fff" />
+      <circle cx="23.2" cy="14.8" r="0.4" fill="#000" />
+      <circle cx="23.2" cy="17.2" r="0.4" fill="#000" />
+      {/* Antenner */}
+      <line x1="24" y1="13.5" x2="27" y2="9" stroke="#000" strokeWidth="0.85" strokeLinecap="round" />
+      <line x1="24" y1="18.5" x2="27" y2="23" stroke="#000" strokeWidth="0.85" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TermiteIcon({ size = 22, faction = 'player' }: { size?: number; faction?: 'player' | 'ai' }) {
+  const body = faction === 'player' ? '#e8d4a8' : '#caa078';
+  const rim = faction === 'player' ? '#9a8458' : '#7a4a28';
+  const sheen = '#f6ecc8';
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="23" rx="9" ry="1.6" fill="#000" opacity="0.28" />
+      {/* Liten, segmentert, blek termitt */}
+      <ellipse cx="9"  cy="16" rx="3.4" ry="2.4" fill={body} stroke={rim} strokeWidth="0.75" />
+      <ellipse cx="14" cy="16" rx="3.0" ry="2.6" fill={body} stroke={rim} strokeWidth="0.75" />
+      <ellipse cx="19" cy="16" rx="2.5" ry="2.2" fill={body} stroke={rim} strokeWidth="0.75" />
+      <ellipse cx="9"  cy="14.6" rx="1.6" ry="0.6" fill={sheen} opacity="0.85" />
+      <ellipse cx="14" cy="14.6" rx="1.4" ry="0.6" fill={sheen} opacity="0.85" />
+      {/* Hode + mandibler */}
+      <circle cx="22.5" cy="16" r="2.5" fill={body} stroke={rim} strokeWidth="0.75" />
+      <line x1="24" y1="14.5" x2="27" y2="13" stroke={rim} strokeWidth="1" strokeLinecap="round" />
+      <line x1="24" y1="17.5" x2="27" y2="19" stroke={rim} strokeWidth="1" strokeLinecap="round" />
+      <circle cx="22" cy="15.4" r="0.45" fill="#0a0a0a" />
+      <circle cx="22" cy="16.6" r="0.45" fill="#0a0a0a" />
     </svg>
   );
 }
 
 function FoodIcon({ size = 22 }: { size?: number }) {
-  // Stylized leaf with vein — the food/"mat" resource
   return (
     <svg width={size} height={size} viewBox="0 0 32 32">
       <path d="M 6 22 Q 6 6 22 6 Q 26 18 16 26 Q 8 26 6 22 Z"
@@ -57,7 +159,6 @@ function FoodIcon({ size = 22 }: { size?: number }) {
       <path d="M 6 22 Q 14 18 22 6" stroke="#3a5a28" strokeWidth="1.4" fill="none" />
       <path d="M 10 20 Q 13 17 16 14" stroke="#3a5a28" strokeWidth="0.7" fill="none" />
       <path d="M 8 18 Q 11 15 14 12" stroke="#3a5a28" strokeWidth="0.7" fill="none" />
-      <ellipse cx="13" cy="13" rx="3" ry="1" fill="#8ec862" opacity="0.5" />
     </svg>
   );
 }
@@ -78,7 +179,6 @@ function MoundIcon({ size = 22, faction = 'player' }: { size?: number; faction?:
 }
 
 function TowerIcon({ size = 22, kind = 'stinger' }: { size?: number; kind?: TowerKind }) {
-  // Stein-tårn med fargesignatur per type.
   const tip = kind === 'webber' ? '#c8c8e8' : kind === 'spitter' ? '#8acc6a' : '#b89048';
   return (
     <svg width={size} height={size} viewBox="0 0 32 32">
@@ -91,7 +191,7 @@ function TowerIcon({ size = 22, kind = 'stinger' }: { size?: number; kind?: Towe
   );
 }
 
-// ── Top bar ─────────────────────────────────────────────────────────────
+// ── Topbar ──────────────────────────────────────────────────────────────
 
 function formatTime(secs: number) {
   const m = Math.floor(secs / 60);
@@ -106,23 +206,14 @@ function VolumeControl() {
   const icon = muted ? '🔇' : vol < 0.34 ? '🔈' : vol < 0.67 ? '🔉' : '🔊';
   return (
     <div className="rts-vol" title={muted ? 'Lyd av' : `Volum ${Math.round(vol * 100)} %`}>
-      <button
-        type="button"
-        className="rts-vol-icon"
-        onClick={() => setVolume(muted ? 0.6 : 0)}
-        aria-label={muted ? 'Slå på lyd' : 'Mute'}
-      >
+      <button type="button" className="rts-vol-icon" onClick={() => setVolume(muted ? 0.6 : 0)}>
         {icon}
       </button>
       <input
         className="rts-vol-slider"
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
+        type="range" min={0} max={1} step={0.05}
         value={vol}
         onChange={(e) => setVolume(parseFloat(e.target.value))}
-        aria-label="Volum"
       />
     </div>
   );
@@ -131,14 +222,10 @@ function VolumeControl() {
 function SpeedBadge({ s }: { s: HudState }) {
   const paused = s.gameSpeed === 0;
   const label = paused ? '⏸' : `▶ ${s.gameSpeed}×`;
-  const title = paused
-    ? 'Pause (Mellomrom) — klikk for å fortsette'
-    : `Hastighet ${s.gameSpeed}× — klikk for neste, Mellomrom for pause, +/− for å endre`;
   return (
     <button
       type="button"
       className={`rts-speed-badge ${paused ? 'paused' : ''}`}
-      title={title}
       onClick={() => {
         if (paused) hudBridge.sendCommand({ type: 'toggle-pause' });
         else hudBridge.sendCommand({ type: 'cycle-speed' });
@@ -194,15 +281,15 @@ function ResValue({ value, className = '' }: { value: number; className?: string
 }
 
 function TopBar({ s }: { s: HudState }) {
-  const wave = s.waveMode;
   const baseHpPct = Math.max(0, (s.player.baseHp / s.player.baseMaxHp) * 100);
+  const wave = s.waveMode;
   return (
     <div className="rts-topbar">
       <div className="rts-brand">Frontline TD</div>
       <SpeedBadge s={s} />
 
       <div className="rts-res">
-        <span className="rts-res-icon"><FoodIcon /></span>
+        <span className="rts-res-icon"><FoodIcon size={28} /></span>
         <div className="rts-res-stack">
           <ResValue value={s.player.gold} />
           <span className="rts-res-label">Mat</span>
@@ -212,7 +299,7 @@ function TopBar({ s }: { s: HudState }) {
       <span className="rts-divider" />
 
       <div className="rts-res">
-        <span className="rts-res-icon"><AntIcon kind="soldier" /></span>
+        <span className="rts-res-icon"><AntIcon size={28} kind="medium" /></span>
         <div className="rts-res-stack">
           <ResValue value={s.player.soldiers} />
           <span className="rts-res-label">På lanene</span>
@@ -223,15 +310,22 @@ function TopBar({ s }: { s: HudState }) {
 
       <div className="rts-enemy-intel">
         <div className="rts-res">
-          <span className="rts-res-icon"><MoundIcon faction="player" /></span>
+          <span className="rts-res-icon"><MoundIcon size={28} faction="player" /></span>
           <div className="rts-res-stack">
             <ResValue value={Math.max(0, s.player.baseHp)} />
             <span className="rts-res-label">Maurtue {Math.round(baseHpPct)}%</span>
           </div>
         </div>
+        <div className="rts-res">
+          <span className="rts-res-icon"><MoundIcon size={28} faction="ai" /></span>
+          <div className="rts-res-stack">
+            <ResValue value={Math.max(0, s.enemy.baseHp)} />
+            <span className="rts-res-label">Fiendebase {Math.round(Math.max(0, (s.enemy.baseHp / Math.max(1, s.enemy.baseMaxHp)) * 100))}%</span>
+          </div>
+        </div>
         {wave && (
           <div className="rts-res">
-            <span className="rts-res-icon"><AntIcon kind="soldier" faction="ai" /></span>
+            <span className="rts-res-icon"><AntIcon size={28} kind="medium" faction="ai" /></span>
             <div className="rts-res-stack">
               <ResValue value={wave.remainingEnemies ?? s.enemy.soldiers} />
               <span className="rts-res-label">Fiender igjen</span>
@@ -248,472 +342,273 @@ function TopBar({ s }: { s: HudState }) {
   );
 }
 
-// ── Minimap ─────────────────────────────────────────────────────────────
+// ── Lane portals (floating buttons over canvas) ─────────────────────────
 
-function Minimap({ s }: { s: HudState }) {
-  const { width: mw, height: mh } = s.map;
-  const { units, buildings } = s.minimap;
-  const cam = s.camera;
-  const handleClick = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const fx = (e.clientX - rect.left) / rect.width;
-    const fy = (e.clientY - rect.top) / rect.height;
-    const x = fx * mw, y = fy * mh;
-    if (e.button === 2 || e.shiftKey) {
-      hudBridge.sendCommand({ type: 'minimap-attack', x, y });
-    } else {
-      hudBridge.sendCommand({ type: 'minimap-pan', x, y });
-    }
-  };
+const LANE_META: Array<{ lane: 0 | 1 | 2; hotkey: '1' | '2' | '3'; label: string }> = [
+  { lane: 0, hotkey: '1', label: 'Nord' },
+  { lane: 1, hotkey: '2', label: 'Midt' },
+  { lane: 2, hotkey: '3', label: 'Sør' },
+];
 
-  return (
-    <div className="rts-panel rts-minimap-panel">
-      <div className="rts-section-title">Slagmark</div>
-      <div className="rts-minimap-frame" onMouseDown={handleClick} onContextMenu={(e) => e.preventDefault()}>
-        <svg viewBox={`0 0 ${mw} ${mh}`} preserveAspectRatio="none">
-          {/* Lane-bånd (under units/buildings) */}
-          {CONFIG.LANES.map((lane) => (
-            <rect
-              key={`lane-${lane.id}`}
-              x={0}
-              y={lane.y - lane.halfHeight}
-              width={mw}
-              height={lane.halfHeight * 2}
-              fill="rgba(90, 74, 44, 0.35)"
-              stroke="rgba(40, 30, 18, 0.7)"
-              strokeWidth={Math.max(1, mw / 400)}
-            />
-          ))}
-          {/* buildings */}
-          {buildings.map((b, i) => {
-            // V9 — Mines fargelegges etter kontroll. Contested = oransje stripet (differensiert
-            // fra AI sin røde) så spilleren ikke forveksler "i kamp" med "fiende-eid".
-            let color: string;
-            let stroke: string = '#000';
-            let strokeW = Math.max(1, mw / 400);
-            if (b.kind === 'mine') {
-              if (b.control === 'contested') {
-                color = '#ffaa33';            // markant oransje
-                stroke = '#ff6600';
-                strokeW = Math.max(2, mw / 240);
-              } else {
-                color = b.control === 'player' ? '#6ec8ff'
-                  : b.control === 'ai' ? '#ff7c5a'
-                  : '#e6c45a';
-              }
-            } else if (b.kind === 'bridge') {
-              color = '#8a6638';
-            } else if (b.kind === 'tower') {
-              const tColor = b.towerType === 'webber' ? '#c8c8e8' : b.towerType === 'spitter' ? '#8acc6a' : '#b89048';
-              color = tColor;
-              // Distinguish tower faction via stroke
-              stroke = b.faction === 'ai' ? '#ff5a30' : '#3a8ec8';
-              strokeW = Math.max(1.5, mw / 320);
-            } else {
-              color = b.faction === 'player' ? '#6ec8ff'
-                : b.faction === 'ai' ? '#ff7c5a'
-                : '#e6c45a';
-            }
-            const w = Math.max(b.w * 0.9, mw * 0.018);
-            const h = Math.max(b.h * 0.9, mh * 0.026);
-            return (
-              <rect key={`b${i}`}
-                x={b.x - w / 2} y={b.y - h / 2}
-                width={w} height={h}
-                fill={color}
-                stroke={stroke} strokeWidth={strokeW}
-                opacity={b.hp > 0 ? 0.95 : 0.3}
-              />
-            );
-          })}
-          {/* units */}
-          {units.map((u, i) => {
-            const color = u.faction === 'player' ? '#cfe3a3' : '#ffb088';
-            const r = u.type === 'soldier' ? mw * 0.008 : mw * 0.006;
-            return <circle key={`u${i}`} cx={u.x} cy={u.y} r={r} fill={color} />;
-          })}
-          {/* viewport rectangle — viser hva kameraet ser */}
-          {cam && (
-            <rect
-              x={cam.x} y={cam.y}
-              width={cam.width} height={cam.height}
-              fill="none"
-              stroke="#ffffff"
-              strokeWidth={Math.max(2, mw / 320)}
-              strokeOpacity={0.85}
-              pointerEvents="none"
-            />
-          )}
-        </svg>
-      </div>
-    </div>
-  );
+// Radial-menyen fanner ut 90° bort fra lane-retningen ved portalen,
+// så den aldri dekker mauren som spawner ut langs lanen.
+const LANE_MENU_CENTER_ANGLE: Record<0 | 1 | 2, number> = {
+  0: -Math.PI / 2,   // Nord-portal: vifter opp
+  1: Math.PI,        // Midt-portal: vifter vestover
+  2: Math.PI / 2,    // Sør-portal: vifter ned
+};
+// Per lane: +1 betyr at hotkey 1 lander først (venstre/topp) i naturlig leseretning,
+// -1 snur viften. Uten dette ville Midt og Sør lest motsatt vei av Nord.
+const LANE_MENU_DIRECTION: Record<0 | 1 | 2, 1 | -1> = {
+  0:  1,  // Nord: 1=venstre, 3=høyre
+  1: -1,  // Midt: 1=topp, 3=bunn (uten flip leses den bottom→top)
+  2: -1,  // Sør: 1=venstre, 3=høyre (uten flip leses den right→left)
+};
+const RADIAL_RADIUS = 118;
+const RADIAL_ARC_PER_OPT = (52 * Math.PI) / 180;
+
+const UNIT_OPTIONS: Array<{ kind: UnitKind; hotkey: '1' | '2' | '3'; label: string }> = [
+  { kind: 'light',  hotkey: '1', label: 'Maur' },
+  { kind: 'medium', hotkey: '2', label: 'Larve' },
+  { kind: 'heavy',  hotkey: '3', label: 'Humle' },
+];
+
+const UNLOCKABLE_OPTIONS: Record<UnitKind, { hotkey: string; label: string } | undefined> = {
+  light: undefined,
+  medium: undefined,
+  heavy: undefined,
+  sumo: { hotkey: '4', label: 'Sumo' },
+  wasp: { hotkey: '5', label: 'Veps' },
+  termite: { hotkey: '6', label: 'Termitt' },
+};
+
+/**
+ * Returner skjerm-koordinater (i CSS-piksler) for et verdens-punkt,
+ * gitt at canvasen er sentrert med letterbox via Phaser.Scale.FIT.
+ */
+function projectWorldToScreen(
+  canvas: HTMLCanvasElement,
+  worldX: number,
+  worldY: number,
+): { x: number; y: number } {
+  const rect = canvas.getBoundingClientRect();
+  const sx = rect.left + (worldX / CONFIG.MAP_WIDTH) * rect.width;
+  const sy = rect.top + (worldY / CONFIG.MAP_HEIGHT) * rect.height;
+  return { x: sx, y: sy };
 }
 
-// ── Lane command stack ─────────────────────────────────────────────────
-//
-// Erstatter det gamle CommandCard-gridet. Ett view om gangen:
-//   - 'home'  → 3 lane-knapper + 1 bygg-knapp (vertikal stack)
-//   - 'lane'  → produksjons-meny for valgt lane (hotkeys 1-6)
-//   - 'build' → samlet tårn/bygg-meny (hotkeys 1-6, 3 grå/disabled inntil videre)
-// ESC backer tilbake til home. Alle paneler har varierte CSS-animasjoner
-// (morph, pop, flip, bounce) for å gjøre HUD-en gøy å trykke på.
+function LanePortals({ s }: { s: HudState }) {
+  const [openLane, setOpenLane] = useState<0 | 1 | 2 | null>(null);
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [, force] = useState(0);
 
-type LaneStackView =
-  | { kind: 'home' }
-  | { kind: 'lane'; lane: 0 | 1 | 2 }
-  | { kind: 'build' };
+  // Finn canvasen og hold den oppdatert
+  useLayoutEffect(() => {
+    const find = () => {
+      const c = document.querySelector('canvas');
+      if (c instanceof HTMLCanvasElement) setCanvas(c);
+    };
+    find();
+    const t = window.setInterval(find, 500);
+    return () => window.clearInterval(t);
+  }, []);
 
-type LaneOption = {
-  id: string;
-  label: string;
-  hotkey: '1' | '2' | '3' | '4' | '5' | '6';
-  costFromState: (s: HudState) => number;
-  icon: (size: number) => React.ReactNode;
-  describe: string;
-  toCommand: (lane: 0 | 1 | 2) => Parameters<typeof hudBridge.sendCommand>[0];
-};
+  // Re-render ved resize så posisjonene oppdateres
+  useLayoutEffect(() => {
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => force((n) => n + 1));
+    ro.observe(canvas);
+    window.addEventListener('resize', () => force((n) => n + 1));
+    return () => ro.disconnect();
+  }, [canvas]);
 
-// Datadrevet liste — utvid med flere enheter når de er implementert i GameScene.
-const LANE_OPTIONS: LaneOption[] = [
-  {
-    id: 'soldier',
-    label: 'Soldat',
-    hotkey: '1',
-    costFromState: (s) => s.costs.soldier,
-    icon: (size) => <AntIcon size={size} kind="soldier" />,
-    describe: 'Marsjerer mot fiende-spawnen',
-    toCommand: (lane) => ({ type: 'send-lane', lane }),
-  },
-];
-
-type BuildOption = {
-  id: BuildKind;
-  label: string;
-  hotkey: '1' | '2' | '3' | '4' | '5' | '6';
-  cost: number;
-  enabled: boolean;
-  category: 'tower' | 'building';
-  describe: string;
-};
-
-const BUILD_OPTIONS: BuildOption[] = [
-  { id: 'stinger', label: 'Spydd',  hotkey: '1', cost: 80,  enabled: true,  category: 'tower',    describe: 'Single-target — høy skade' },
-  { id: 'webber',  label: 'Nett',   hotkey: '2', cost: 100, enabled: true,  category: 'tower',    describe: 'Sløver fienden 50 %' },
-  { id: 'spitter', label: 'Spytt',  hotkey: '3', cost: 120, enabled: true,  category: 'tower',    describe: 'Splash-skade i område' },
-  { id: 'farm',    label: 'Farm',   hotkey: '4', cost: 60,  enabled: false, category: 'building', describe: 'Kommer snart' },
-  { id: 'wall',    label: 'Mur',    hotkey: '5', cost: 20,  enabled: false, category: 'building', describe: 'Kommer snart' },
-  { id: 'armory',  label: 'Smie',   hotkey: '6', cost: 100, enabled: false, category: 'building', describe: 'Kommer snart' },
-];
-
-const LANE_META: Array<{ lane: 0 | 1 | 2; hotkey: '1' | '2' | '3'; label: string; arrow: string }> = [
-  { lane: 0, hotkey: '1', label: 'Nord', arrow: '↑' },
-  { lane: 1, hotkey: '2', label: 'Midt', arrow: '→' },
-  { lane: 2, hotkey: '3', label: 'Sør',  arrow: '↓' },
-];
-
-function countSoldiersPerLane(s: HudState): [number, number, number] {
-  const counts: [number, number, number] = [0, 0, 0];
-  const lanes = CONFIG.LANES;
-  if (!lanes) return counts;
-  for (const u of s.minimap.units) {
-    if (u.faction !== 'player' || u.type !== 'soldier') continue;
-    for (let i = 0; i < 3 && i < lanes.length; i++) {
-      if (Math.abs(u.y - lanes[i].y) <= lanes[i].halfHeight) {
-        counts[i]++;
-        break;
+  // Bygg full opsjons-liste fra standard + de som er låst opp via oppgraderinger.
+  const allOptions = useMemo(() => {
+    const opts: Array<{ kind: UnitKind; hotkey: string; label: string }> = [...UNIT_OPTIONS];
+    for (const k of s.unlockedUnits) {
+      const meta = UNLOCKABLE_OPTIONS[k];
+      if (meta && !opts.find((o) => o.kind === k)) {
+        opts.push({ kind: k, hotkey: meta.hotkey, label: meta.label });
       }
     }
-  }
-  return counts;
-}
+    return opts;
+  }, [s.unlockedUnits]);
 
-// Liten utility: trigger CSS-animasjon på et element ved å reflowe + re-add klassen.
-function playShake(el: HTMLElement | null) {
-  if (!el) return;
-  el.classList.remove('shaking');
-  // force reflow så animasjonen restartes
-  void el.offsetWidth;
-  el.classList.add('shaking');
-}
-
-function LaneCommandStack({ s }: { s: HudState }) {
-  const [view, setView] = useState<LaneStackView>({ kind: 'home' });
-  const panelRef = useRef<HTMLDivElement>(null);
-  const buildActive = !!s.buildMode;
-
-  // Refs så hotkey-handleren ikke re-attaches på hver state-push (~60Hz).
-  const stateRef = useRef(s);
-  const viewRef = useRef(view);
-  const buildActiveRef = useRef(buildActive);
-  stateRef.current = s;
-  viewRef.current = view;
-  buildActiveRef.current = buildActive;
-
-  // Hotkey-handler: 1/2/3/B i home, 1-6 i menyene, Esc tilbake.
+  // Hotkeys: 1/2/3 åpner lane-meny; i menyen velger 1/2/3/4 unit-type
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-
+      if (s.upgradeChoice) return;  // upgrade-modalen eier 1/2/3 i den modusen
       const k = e.key;
-      const v = viewRef.current;
-      const st = stateRef.current;
-
-      if (v.kind === 'home') {
+      if (openLane === null) {
         if (k === '1' || k === '2' || k === '3') {
-          setView({ kind: 'lane', lane: (parseInt(k, 10) - 1) as 0 | 1 | 2 });
-          e.preventDefault();
-        } else if (k === 'b' || k === 'B') {
-          setView({ kind: 'build' });
-          e.preventDefault();
-        }
-        return;
-      }
-
-      if (v.kind === 'lane') {
-        if (k === 'Escape') {
-          setView({ kind: 'home' });
-          e.preventDefault();
-          return;
-        }
-        const opt = LANE_OPTIONS.find((o) => o.hotkey === k);
-        if (opt) {
-          const cost = opt.costFromState(st);
-          if (st.player.gold >= cost) {
-            hudBridge.sendCommand(opt.toCommand(v.lane));
-          } else {
-            playShake(panelRef.current?.querySelector(`[data-hotkey="${k}"]`) ?? null);
+          const target = (parseInt(k, 10) - 1) as 0 | 1 | 2;
+          // Bare åpne hvis lanen finnes som portal i nåværende stage.
+          if (s.lanePortals.some((p) => p.lane === target)) {
+            setOpenLane(target);
+            e.preventDefault();
           }
-          e.preventDefault();
         }
-        return;
-      }
-
-      if (v.kind === 'build') {
-        if (k === 'Escape') {
-          if (buildActiveRef.current) hudBridge.sendCommand({ type: 'build-cancel' });
-          setView({ kind: 'home' });
-          e.preventDefault();
-          return;
-        }
-        const opt = BUILD_OPTIONS.find((o) => o.hotkey === k);
+      } else {
+        if (k === 'Escape') { setOpenLane(null); e.preventDefault(); return; }
+        const opt = allOptions.find((o) => o.hotkey === k);
         if (opt) {
-          if (opt.enabled && st.player.gold >= opt.cost) {
-            hudBridge.sendCommand({ type: 'build-start', kind: opt.id });
-            setView({ kind: 'home' });
-          } else {
-            playShake(panelRef.current?.querySelector(`[data-hotkey="${k}"]`) ?? null);
-          }
+          hudBridge.sendCommand({ type: 'send-lane', lane: openLane, unitKind: opt.kind });
+          setOpenLane(null);
           e.preventDefault();
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [openLane, s.upgradeChoice, allOptions, s.lanePortals]);
 
-  // Key på indre wrapper sørger for at CSS-animasjoner restartes når view skifter.
-  const viewKey = view.kind === 'lane' ? `lane-${view.lane}` : view.kind;
+  if (!canvas) return null;
 
   return (
-    <div className="rts-panel rts-lane-stack" ref={panelRef} data-view={view.kind}>
-      <div key={viewKey} className={`rts-stack-view rts-view-${view.kind}`}>
-        {view.kind === 'home' && (
-          <HomeView s={s} onPickLane={(lane) => setView({ kind: 'lane', lane })} onPickBuild={() => setView({ kind: 'build' })} buildActive={buildActive} />
-        )}
-        {view.kind === 'lane' && (
-          <LaneView s={s} lane={view.lane} onBack={() => setView({ kind: 'home' })} />
-        )}
-        {view.kind === 'build' && (
-          <BuildView s={s} onBack={() => setView({ kind: 'home' })} onPicked={() => setView({ kind: 'home' })} buildActive={buildActive} />
-        )}
+    <>
+      {/* Klikk-fanger som lukker menyen ved utenfor-klikk (under portalene, over alt annet) */}
+      {openLane !== null && (
+        <div
+          className="rts-lane-portal-backdrop"
+          onClick={() => setOpenLane(null)}
+          onContextMenu={(e) => { e.preventDefault(); setOpenLane(null); }}
+        />
+      )}
+      {s.lanePortals.map((portal) => {
+        const meta = LANE_META[portal.lane];
+        const pos = projectWorldToScreen(canvas, portal.worldX, portal.worldY);
+        const isOpen = openLane === portal.lane;
+        // Når en lane er åpen, skjul de to andre portalene helt
+        const hideOthers = openLane !== null && !isOpen;
+        if (hideOthers) return null;
+        const soldiers = s.laneCounts[portal.lane];
+        const centerAngle = LANE_MENU_CENTER_ANGLE[portal.lane];
+        const dirMul = LANE_MENU_DIRECTION[portal.lane];
+        const n = allOptions.length;
+        const arcSpan = RADIAL_ARC_PER_OPT * Math.max(0, n - 1);
+        return (
+          <div
+            key={`portal-${portal.lane}`}
+            className={`rts-lane-portal ${isOpen ? 'is-open' : ''}`}
+            style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
+          >
+            <button
+              className={`rts-lane-portal-btn lane-${portal.lane} ${isOpen ? 'is-active' : ''}`}
+              onClick={() => setOpenLane(isOpen ? null : portal.lane)}
+              title={isOpen ? 'Lukk meny' : `${meta.label}-lane — åpne meny [${meta.hotkey}]`}
+            >
+              <span className="rts-portal-hotkey">{meta.hotkey}</span>
+              <span className="rts-portal-label">{meta.label}</span>
+              <span className="rts-portal-count">
+                <AntIcon size={16} kind="medium" /> {soldiers}
+              </span>
+            </button>
+            {isOpen && (
+              <div className="rts-lane-portal-radial" aria-label={`${meta.label}-meny`}>
+                {allOptions.map((opt, i) => {
+                  const t = n <= 1 ? 0 : i / (n - 1);
+                  const angle = centerAngle + (t - 0.5) * arcSpan * dirMul;
+                  const dx = Math.cos(angle) * RADIAL_RADIUS;
+                  const dy = Math.sin(angle) * RADIAL_RADIUS;
+                  const cost = s.costs[opt.kind];
+                  const cant = s.player.gold < cost;
+                  return (
+                    <button
+                      key={opt.kind}
+                      className={`rts-portal-radial-opt ${cant ? 'cant-afford' : 'affordable'} unit-${opt.kind}`}
+                      style={{
+                        ['--dx' as never]: `${dx}px`,
+                        ['--dy' as never]: `${dy}px`,
+                        ['--i' as never]: i,
+                      }}
+                      onClick={() => {
+                        hudBridge.sendCommand({ type: 'send-lane', lane: portal.lane, unitKind: opt.kind });
+                        setOpenLane(null);
+                      }}
+                      title={`${opt.label} (${cost} mat) [${opt.hotkey}]`}
+                    >
+                      <span className="rts-portal-radial-hotkey">{opt.hotkey}</span>
+                      <span className="rts-portal-radial-icon"><AntIcon size={48} kind={opt.kind} /></span>
+                      <span className="rts-portal-radial-label">{opt.label}</span>
+                      <span className={`rts-portal-radial-cost ${cant ? 'cant' : ''}`}>
+                        <FoodIcon size={14} /> {cost}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// ── Build panel (tårn) ──────────────────────────────────────────────────
+
+const BUILD_OPTIONS: Array<{ id: TowerKind; hotkey: 'Q' | 'W' | 'E'; label: string; describe: string }> = [
+  { id: 'stinger', hotkey: 'Q', label: 'Spydd', describe: 'Single-target — høy skade' },
+  { id: 'webber',  hotkey: 'W', label: 'Nett',  describe: 'Sløver fienden 50 %' },
+  { id: 'spitter', hotkey: 'E', label: 'Spytt', describe: 'Splash i område' },
+];
+
+function BuildPanel({ s }: { s: HudState }) {
+  const buildActive = !!s.buildMode;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (s.upgradeChoice) return;
+      const k = e.key.toUpperCase();
+      const opt = BUILD_OPTIONS.find((o) => o.hotkey === k);
+      if (opt) {
+        if (s.player.gold >= s.towerCosts[opt.id]) {
+          hudBridge.sendCommand({ type: 'build-start', kind: opt.id });
+          e.preventDefault();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [s.player.gold, s.towerCosts, s.upgradeChoice]);
+
+  return (
+    <div className="rts-panel rts-build-panel">
+      <div className="rts-section-title">Tårn</div>
+      <div className="rts-build-row">
+        {BUILD_OPTIONS.map((opt, i) => {
+          const cost = s.towerCosts[opt.id];
+          const cant = s.player.gold < cost;
+          const active = buildActive && s.buildMode?.kind === opt.id;
+          return (
+            <button
+              key={opt.id}
+              className={`rts-build-opt ${cant ? 'cant-afford' : 'affordable'} ${active ? 'active' : ''}`}
+              style={{ ['--i' as never]: i }}
+              onClick={() => hudBridge.sendCommand({ type: 'build-start', kind: opt.id })}
+              title={`${opt.label} — ${opt.describe} (${cost} mat) [${opt.hotkey}]`}
+            >
+              <span className="rts-build-hotkey">{opt.hotkey}</span>
+              <span className="rts-build-icon-wrap"><TowerIcon size={48} kind={opt.id} /></span>
+              <span className="rts-build-label">{opt.label}</span>
+              <span className={`rts-build-cost ${cant ? 'cant' : ''}`}>
+                <FoodIcon size={13} /> {cost}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function HomeView({ s, onPickLane, onPickBuild, buildActive }: {
-  s: HudState;
-  onPickLane: (lane: 0 | 1 | 2) => void;
-  onPickBuild: () => void;
-  buildActive: boolean;
-}) {
-  const laneCost = s.costs.soldier;
-  const cantAfford = s.player.gold < laneCost;
-  const soldierCounts = countSoldiersPerLane(s);
-
-  return (
-    <>
-      <div className="rts-section-title">Lanes</div>
-      <div className="rts-lane-buttons">
-        {LANE_META.map((meta, i) => (
-          <button
-            key={`lane-${meta.lane}`}
-            className={`rts-lane-button ${cantAfford ? '' : 'affordable'}`}
-            style={{ ['--i' as string]: i }}
-            onClick={() => onPickLane(meta.lane)}
-            title={`Åpne ${meta.label}-lane meny [${meta.hotkey}]`}
-          >
-            <span className="rts-lane-hotkey">{meta.hotkey}</span>
-            <span className="rts-lane-arrow">{meta.arrow}</span>
-            <span className="rts-lane-name">{meta.label}-lane</span>
-            <span className="rts-lane-count" title="Egne soldater på lanen">
-              <AntIcon size={14} kind="soldier" /> {soldierCounts[meta.lane]}
-            </span>
-          </button>
-        ))}
-      </div>
-      <button
-        className={`rts-build-button ${buildActive ? 'active' : ''}`}
-        style={{ ['--i' as string]: 3 }}
-        onClick={onPickBuild}
-        title="Åpne bygg-meny [B]"
-      >
-        <span className="rts-lane-hotkey">B</span>
-        <span className="rts-build-hammer">⚒</span>
-        <span className="rts-lane-name">Bygg</span>
-        <span className="rts-lane-count" title="Tårn bygget">{s.stats.playerTowers}</span>
-      </button>
-    </>
-  );
-}
-
-function LaneView({ s, lane, onBack }: { s: HudState; lane: 0 | 1 | 2; onBack: () => void }) {
-  const meta = LANE_META[lane];
-  return (
-    <>
-      <button className="rts-menu-header" onClick={onBack} title="Tilbake [Esc]">
-        <span className="rts-menu-back">‹</span>
-        <span className="rts-menu-header-title">
-          <span className="rts-lane-hotkey inline">{meta.hotkey}</span>
-          {meta.label}-lane <span className="rts-lane-arrow tiny">{meta.arrow}</span>
-        </span>
-        <span className="rts-menu-hint">Esc</span>
-      </button>
-      <div className="rts-menu-grid">
-        {LANE_OPTIONS.map((opt, i) => {
-          const cost = opt.costFromState(s);
-          const cant = s.player.gold < cost;
-          return (
-            <MenuOption
-              key={opt.id}
-              index={i}
-              hotkey={opt.hotkey}
-              label={opt.label}
-              cost={cost}
-              enabled={true}
-              canAfford={!cant}
-              icon={opt.icon(38)}
-              describe={opt.describe}
-              onActivate={() => hudBridge.sendCommand(opt.toCommand(lane))}
-            />
-          );
-        })}
-      </div>
-      <div className="rts-menu-foot">Trykk tallet for å sende · Esc tilbake</div>
-    </>
-  );
-}
-
-function BuildView({ s, onBack, onPicked, buildActive }: {
-  s: HudState;
-  onBack: () => void;
-  onPicked: () => void;
-  buildActive: boolean;
-}) {
-  return (
-    <>
-      <button className="rts-menu-header" onClick={onBack} title="Tilbake [Esc]">
-        <span className="rts-menu-back">‹</span>
-        <span className="rts-menu-header-title">
-          <span className="rts-lane-hotkey inline">B</span>
-          Bygg <span className="rts-build-hammer tiny">⚒</span>
-        </span>
-        <span className="rts-menu-hint">Esc</span>
-      </button>
-      <div className="rts-menu-grid two-col">
-        {BUILD_OPTIONS.map((opt, i) => {
-          const cant = s.player.gold < opt.cost;
-          const active = buildActive && s.buildMode?.kind === opt.id;
-          const icon = opt.category === 'tower'
-            ? <TowerIcon size={38} kind={opt.id as TowerKind} />
-            : <span className="rts-build-glyph">{opt.id === 'farm' ? '🌱' : opt.id === 'wall' ? '🧱' : '⚙'}</span>;
-          return (
-            <MenuOption
-              key={opt.id}
-              index={i}
-              hotkey={opt.hotkey}
-              label={opt.label}
-              cost={opt.cost}
-              enabled={opt.enabled}
-              canAfford={!cant}
-              active={active}
-              icon={icon}
-              describe={opt.describe}
-              onActivate={() => {
-                hudBridge.sendCommand({ type: 'build-start', kind: opt.id });
-                onPicked();
-              }}
-            />
-          );
-        })}
-      </div>
-      <div className="rts-menu-foot">Trykk 1-6 for å velge · Esc tilbake</div>
-    </>
-  );
-}
-
-function MenuOption({ index, hotkey, label, cost, enabled, canAfford, active, icon, describe, onActivate }: {
-  index: number;
-  hotkey: string;
-  label: string;
-  cost: number;
-  enabled: boolean;
-  canAfford: boolean;
-  active?: boolean;
-  icon: React.ReactNode;
-  describe: string;
-  onActivate: () => void;
-}) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const disabled = !enabled || !canAfford;
-  const className = [
-    'rts-menu-option',
-    enabled ? '' : 'soon',
-    !canAfford && enabled ? 'cant-afford' : '',
-    canAfford && enabled ? 'affordable' : '',
-    active ? 'active' : '',
-  ].filter(Boolean).join(' ');
-
-  const handle = () => {
-    if (disabled) {
-      playShake(ref.current);
-      return;
-    }
-    onActivate();
-  };
-
-  return (
-    <button
-      ref={ref}
-      className={className}
-      data-hotkey={hotkey}
-      style={{ ['--i' as string]: index }}
-      onClick={handle}
-      title={`${label} — ${describe} (${cost} mat) [${hotkey}]`}
-    >
-      <span className="rts-menu-option-hotkey">{hotkey}</span>
-      <span className="rts-menu-option-icon">{icon}</span>
-      <span className="rts-menu-option-label">{label}</span>
-      <span className={`rts-menu-option-cost ${!canAfford && enabled ? 'cant' : ''}`}>{cost}</span>
-      {!enabled && <span className="rts-menu-option-soon">snart</span>}
-    </button>
-  );
-}
-
-// ── Game-over screen ───────────────────────────────────────────────────
+// ── Game-over ──────────────────────────────────────────────────────────
 
 function GameOver({ s }: { s: HudState }) {
   if (s.state === 'running') return null;
@@ -734,16 +629,10 @@ function GameOver({ s }: { s: HudState }) {
         <div><span>Base-HP igjen</span><strong>{Math.max(0, s.player.baseHp)}</strong></div>
       </div>
       <div className="rts-gameover-actions">
-        <button
-          className="rts-gameover-btn primary"
-          onClick={() => hudBridge.sendCommand({ type: 'restart' })}
-        >
+        <button className="rts-gameover-btn primary" onClick={() => hudBridge.sendCommand({ type: 'restart' })}>
           ↻ Spill igjen <kbd>R</kbd>
         </button>
-        <button
-          className="rts-gameover-btn"
-          onClick={() => hudBridge.sendCommand({ type: 'to-menu' })}
-        >
+        <button className="rts-gameover-btn" onClick={() => hudBridge.sendCommand({ type: 'to-menu' })}>
           Til hovedmeny
         </button>
       </div>
@@ -751,43 +640,42 @@ function GameOver({ s }: { s: HudState }) {
   );
 }
 
-// ── Hotkeys cheat-sheet (V8) ──────────────────────────────────────────
+// ── Hotkeys cheat-sheet ───────────────────────────────────────────────
 
 const HOTKEYS: Array<{ section: string; keys: Array<[string, string]> }> = [
   {
-    section: 'Lane-menyer',
+    section: 'Lane-portaler',
     keys: [
       ['1', 'Åpne Nord-lane meny'],
       ['2', 'Åpne Midt-lane meny'],
       ['3', 'Åpne Sør-lane meny'],
-      ['1-6 (i meny)', 'Velg enhet å sende'],
-      ['Esc', 'Tilbake til lane-oversikt'],
+      ['1', 'I meny: send Maur (lett)'],
+      ['2', 'I meny: send Larve (medium)'],
+      ['3', 'I meny: send Humle (tung)'],
+      ['Esc', 'Lukk meny'],
     ],
   },
   {
-    section: 'Bygg',
+    section: 'Tårn',
     keys: [
-      ['B', 'Åpne bygg-meny (tårn + bygninger)'],
-      ['1-6 (i meny)', 'Velg bygg-type'],
-      ['Venstreklikk', 'Plasser tårn (utenfor lane-bånd)'],
-      ['Shift+klikk', 'Plasser flere uten å gå ut av bygg-modus'],
-      ['Esc / Høyreklikk', 'Avbryt bygg-modus'],
+      ['Q', 'Velg Spydd-tårn'],
+      ['W', 'Velg Nett-tårn'],
+      ['E', 'Velg Spytt-tårn'],
+      ['Klikk gress', 'Plasser tårn (utenfor stier/arena)'],
+      ['Shift+klikk', 'Plasser flere'],
+      ['Esc / Høyreklikk', 'Avbryt'],
     ],
   },
   {
     section: 'Waves',
-    keys: [
-      ['G', 'Klar — hopp over forberedelsestid og start neste bølge'],
-    ],
+    keys: [['G', 'Start neste bølge (3-2-1-countdown)']],
   },
   {
-    section: 'Kamera & spill',
+    section: 'Spill',
     keys: [
-      ['WASD / piltaster', 'Panorér kamera'],
-      ['Klikk minimap', 'Pan til punkt'],
-      ['Mellomrom', 'Pause / fortsett'],
-      ['+ / −', 'Endre hastighet (1× / 2× / 3×)'],
-      ['H', 'Vis / skjul denne hjelpen'],
+      ['Mellomrom', 'Pause'],
+      ['+ / −', 'Endre hastighet'],
+      ['H', 'Vis / skjul hjelp'],
       ['R', 'Restart (etter game over)'],
     ],
   },
@@ -805,8 +693,8 @@ function HotkeysPanel({ onClose }: { onClose: () => void }) {
           {HOTKEYS.map((sec) => (
             <div className="rts-hotkeys-section" key={sec.section}>
               <div className="rts-hotkeys-section-title">{sec.section}</div>
-              {sec.keys.map(([k, desc]) => (
-                <div className="rts-hotkeys-row" key={k}>
+              {sec.keys.map(([k, desc], i) => (
+                <div className="rts-hotkeys-row" key={`${k}-${i}`}>
                   <kbd>{k}</kbd>
                   <span>{desc}</span>
                 </div>
@@ -820,10 +708,8 @@ function HotkeysPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ── Alert banner (M1.5) ────────────────────────────────────────────────
+// ── Alert / wave / build banners ──────────────────────────────────────
 
-// GameScene sletter currentAlert ~3s etter triggeredAt og emitter ny state,
-// så vi bare speiler s.alert direkte uten React-timing.
 function AlertBanner({ s }: { s: HudState }) {
   if (!s.alert) return null;
   return (
@@ -834,43 +720,19 @@ function AlertBanner({ s }: { s: HudState }) {
   );
 }
 
-// ── Wave banner (M2.2) ────────────────────────────────────────────────
-
 function WaveBanner({ s }: { s: HudState }) {
   if (!s.waveMode) return null;
-  const { current, total, active, preparing, prepRemainingMs, nextWavePreview, remainingEnemies } = s.waveMode;
-  const ms = prepRemainingMs ?? 0;
-  const sec = Math.ceil(ms / 1000);
-  const mm = Math.floor(sec / 60);
-  const ss = sec % 60;
-  const countdown = `${mm}:${ss.toString().padStart(2, '0')}`;
-  const upcoming = current + 1;
-  const laneLabel = (l: 0 | 1 | 2 | 'all') => l === 'all' ? 'alle 3' : l === 0 ? 'Nord' : l === 1 ? 'Midt' : 'Sør';
+  const { current, total, active, idle, inCountdown, remainingEnemies, choosingUpgrade } = s.waveMode;
+
+  // Modal og sentrert start-meny eier skjermen i sine egne modi — banner blir distrahende.
+  if (choosingUpgrade) return null;
+  if (idle) return null;
+  if (inCountdown) return null;
 
   return (
     <div className={`rts-wave-banner ${active ? 'active' : 'cooldown'}`}>
       <span className="rts-wave-label">Bølge</span>
       <span className="rts-wave-count">{Math.max(0, current)} / {total}</span>
-
-      {preparing && nextWavePreview && (
-        <>
-          <span className="rts-wave-next">
-            Neste (#{upcoming}): <strong>{nextWavePreview.soldiers}</strong> fiender
-            {nextWavePreview.tank && <span style={{ color: '#ee9544' }}> · tank</span>}
-            {nextWavePreview.boss && <span style={{ color: '#ff5544' }}> · BOSS</span>}
-            <span style={{ opacity: 0.75 }}> · lane: {laneLabel(nextWavePreview.lane)}</span>
-          </span>
-          <span className="rts-wave-next">Klar om <strong>{countdown}</strong></span>
-          <button
-            type="button"
-            className="rts-wave-ready-btn"
-            onClick={() => hudBridge.sendCommand({ type: 'wave-ready' })}
-            title="Hopp over forberedelsestid og start neste bølge nå [G]"
-          >
-            Klar! <kbd>G</kbd>
-          </button>
-        </>
-      )}
       {active && (
         <span className="rts-wave-next">
           Forsvarer base — <strong>{remainingEnemies ?? 0}</strong> fiender igjen
@@ -879,8 +741,6 @@ function WaveBanner({ s }: { s: HudState }) {
     </div>
   );
 }
-
-// ── Build-mode banner (M2.1) ──────────────────────────────────────────
 
 function BuildModeBanner({ s }: { s: HudState }) {
   if (!s.buildMode) return null;
@@ -892,14 +752,190 @@ function BuildModeBanner({ s }: { s: HudState }) {
       <div className="rts-build-info">
         <div className="rts-build-title">Plasserer {labels[kind] ?? kind} — {s.buildMode.cost} mat</div>
         <div className="rts-build-hint">
-          Venstreklikk plasserer (utenfor lane-bånd) · Shift+klikk for flere · Esc avbryter
+          Venstreklikk plasserer (på gress, utenfor stier) · Shift+klikk for flere · Esc avbryter
         </div>
       </div>
-      <button
-        className="rts-build-cancel"
-        type="button"
-        onClick={() => hudBridge.sendCommand({ type: 'build-cancel' })}
-      >Avbryt</button>
+      <button className="rts-build-cancel" type="button" onClick={() => hudBridge.sendCommand({ type: 'build-cancel' })}>
+        Avbryt
+      </button>
+    </div>
+  );
+}
+
+// ── Upgrade choice modal (mellom hver bølge) ──────────────────────────
+
+const RARITY_META: Record<HudUpgradeRarity, { label: string; tone: string }> = {
+  common:  { label: 'Vanlig',   tone: '#9fb3a8' },
+  rare:    { label: 'Sjelden',  tone: '#6ec0ff' },
+  epic:    { label: 'Episk',    tone: '#c98aff' },
+  cursed:  { label: 'Forbannet', tone: '#ff6b6b' },
+  silly:   { label: 'Sprøtt',   tone: '#ffb84a' },
+};
+
+function UpgradeChoiceModal({ s }: { s: HudState }) {
+  const choice = s.upgradeChoice;
+
+  // Hotkeys: 1/2/3 plukker kortet på samme indeks
+  useEffect(() => {
+    if (!choice) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const idx = ['1', '2', '3'].indexOf(e.key);
+      if (idx >= 0 && idx < choice.options.length) {
+        hudBridge.sendCommand({ type: 'select-upgrade', id: choice.options[idx].id });
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    // capture: true så vi vinner over lane-portalenes 1/2/3-handler
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [choice]);
+
+  if (!choice) return null;
+  return (
+    <div className="rts-upgrade-overlay" role="dialog" aria-modal="true">
+      <div className="rts-upgrade-card-wrap">
+        <div className="rts-upgrade-header">
+          <div className="rts-upgrade-eyebrow">Bølge {choice.clearedWave} klar</div>
+          <div className="rts-upgrade-title">Velg én oppgradering</div>
+          <div className="rts-upgrade-subtitle">Bare ett kort. Velg klokt — eller dumt.</div>
+          {choice.taken.length > 0 && (
+            <div className="rts-upgrade-taken" title="Allerede valgt">
+              {choice.taken.map((t) => (
+                <span className="rts-upgrade-taken-chip" key={t.id} title={t.name}>
+                  <span className="rts-upgrade-taken-icon">{t.icon}</span>
+                  <span className="rts-upgrade-taken-name">{t.name}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="rts-upgrade-cards">
+          {choice.options.map((opt, i) => {
+            const meta = RARITY_META[opt.rarity];
+            return (
+              <button
+                key={opt.id}
+                className={`rts-upgrade-card rarity-${opt.rarity}`}
+                style={{ ['--rarity-tone' as never]: meta.tone, ['--i' as never]: i }}
+                onClick={() => hudBridge.sendCommand({ type: 'select-upgrade', id: opt.id })}
+              >
+                <span className="rts-upgrade-hotkey">{i + 1}</span>
+                <span className="rts-upgrade-rarity" style={{ color: meta.tone, borderColor: meta.tone }}>
+                  {meta.label}
+                </span>
+                <span className="rts-upgrade-icon">{opt.icon}</span>
+                <span className="rts-upgrade-name">{opt.name}</span>
+                <span className="rts-upgrade-desc">{opt.description}</span>
+                <span className="rts-upgrade-flavor">"{opt.flavor}"</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Wave start (sentrert meny) + 3-2-1 countdown ──────────────────────
+
+function WaveStartMenu({ s }: { s: HudState }) {
+  const wave = s.waveMode;
+  if (s.state !== 'running') return null;
+  if (!wave || !wave.idle) return null;
+  if (s.upgradeChoice) return null;  // upgrade-modalen eier skjermen først
+  const next = wave.nextWavePreview;
+  const upcoming = wave.upcomingWaveNumber ?? wave.current + 1;
+  const laneLabel = (l: 0 | 1 | 2 | 'all') => l === 'all' ? 'alle 3' : l === 0 ? 'Nord' : l === 1 ? 'Midt' : 'Sør';
+  const unitLabel = (k: UnitKind) =>
+    k === 'light' ? 'maur' :
+    k === 'medium' ? 'larver' :
+    k === 'heavy' ? 'humler' :
+    k === 'sumo' ? 'sumo-maur' :
+    k === 'wasp' ? 'veps' :
+    k === 'termite' ? 'termitter' : 'fiender';
+
+  return (
+    <div className="rts-wave-start-overlay" role="dialog" aria-modal="true">
+      <div className="rts-wave-start-card">
+        <div className="rts-wave-start-eyebrow">Klar for neste runde</div>
+        <div className="rts-wave-start-title">Bølge {upcoming}<span className="rts-wave-start-total"> / {wave.total}</span></div>
+        {next && (
+          <div className="rts-wave-start-preview">
+            <span><strong>{next.soldiers}</strong> {unitLabel(next.unitKind)}</span>
+            {next.boss && <span className="rts-wave-start-boss">BOSS</span>}
+            <span className="rts-wave-start-lane">Lane: {laneLabel(next.lane)}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          className="rts-wave-start-btn"
+          autoFocus
+          onClick={() => hudBridge.sendCommand({ type: 'start-wave' })}
+        >
+          ▶ Start bølge <kbd>G</kbd>
+        </button>
+        <div className="rts-wave-start-hint">
+          Du kan bare bygge og sende soldater <em>etter</em> at bølgen er i gang.
+          <br />Begge sider starter samtidig.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CountdownOverlay({ s }: { s: HudState }) {
+  const wave = s.waveMode;
+  if (!wave || !wave.inCountdown) return null;
+  const ms = wave.countdownRemainingMs ?? 0;
+  // 3000–2001 → "3", 2000–1001 → "2", 1000–1 → "1", ≤0 → "GÅ!"
+  let label: string;
+  let key: string;
+  if (ms > 2000) { label = '3'; key = '3'; }
+  else if (ms > 1000) { label = '2'; key = '2'; }
+  else if (ms > 0) { label = '1'; key = '1'; }
+  else { label = 'GÅ!'; key = 'go'; }
+  const upcoming = wave.upcomingWaveNumber ?? wave.current + 1;
+
+  return (
+    <div className="rts-countdown-overlay" aria-live="assertive">
+      <div className="rts-countdown-eyebrow">Bølge {upcoming} starter</div>
+      <div key={key} className={`rts-countdown-number ${label === 'GÅ!' ? 'go' : ''}`}>{label}</div>
+    </div>
+  );
+}
+
+// ── Active upgrades strip ─────────────────────────────────────────────
+
+const RARITY_TONES: Record<HudUpgradeRarity, string> = {
+  common:  '#9fb3a8',
+  rare:    '#6ec0ff',
+  epic:    '#c98aff',
+  cursed:  '#ff6b6b',
+  silly:   '#ffb84a',
+};
+
+function ActiveUpgradesStrip({ s }: { s: HudState }) {
+  if (!s.activeUpgrades || s.activeUpgrades.length === 0) return null;
+  return (
+    <div className="rts-active-upgrades" aria-label="Aktive oppgraderinger">
+      <span className="rts-active-upgrades-label">Aktive:</span>
+      <div className="rts-active-upgrades-chips">
+        {s.activeUpgrades.map((u) => (
+          <span
+            key={u.id}
+            className={`rts-active-upgrade rarity-${u.rarity}`}
+            style={{ ['--rarity-tone' as never]: RARITY_TONES[u.rarity] }}
+            title={`${u.name} — ${u.description}`}
+          >
+            <span className="rts-active-upgrade-icon">{u.icon}</span>
+            <span className="rts-active-upgrade-name">{u.name}</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -913,10 +949,8 @@ export function HudOverlay() {
   const onState = useCallback((s: HudState) => setState(s), []);
   useEffect(() => hudBridge.onState(onState), [onState]);
 
-  // V8 — H-tast toggler hotkey-overlay. Esc lukker den.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ignorer modifier-kombinasjoner og input-felter
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -926,28 +960,34 @@ export function HudOverlay() {
       } else if (e.key === 'Escape' && showHotkeys) {
         setShowHotkeys(false);
         e.preventDefault();
+      } else if ((e.key === 'g' || e.key === 'G') && state?.waveMode?.idle && !state?.upgradeChoice) {
+        hudBridge.sendCommand({ type: 'start-wave' });
+        e.preventDefault();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [showHotkeys]);
+  }, [showHotkeys, state]);
 
   if (!state) return null;
 
   return (
     <div className="rts-hud">
       <TopBar s={state} />
+      <ActiveUpgradesStrip s={state} />
       <WaveBanner s={state} />
       <AlertBanner s={state} />
       <BuildModeBanner s={state} />
-      <Minimap s={state} />
-      <LaneCommandStack s={state} />
+      <BuildPanel s={state} />
+      <LanePortals s={state} />
+      <WaveStartMenu s={state} />
+      <CountdownOverlay s={state} />
       <GameOver s={state} />
+      <UpgradeChoiceModal s={state} />
       <button
         className="rts-help-fab"
         type="button"
         title="Hurtigtaster (H)"
-        aria-label="Vis hurtigtaster"
         onClick={() => setShowHotkeys(true)}
       >?</button>
       {showHotkeys && <HotkeysPanel onClose={() => setShowHotkeys(false)} />}

@@ -1,0 +1,9 @@
+- generic [ref=e7]:
+  - generic [ref=e8]:
+    - generic [ref=e9]: Trinn 1 / 5
+    - button "Hopp over tutorial" [ref=e10] [cursor=pointer]: Hopp over
+  - generic [ref=e11]: Velkommen, Maur-konge!
+  - generic [ref=e12]: Kolonien din ligger i vest. I øst rykker fiendebølger fram langs 3 lanes (Nord, Midt, Sør). Hold maurtua di i live i 15 bølger — så vinner du. Panorér kameraet med WASD eller piltaster, eller klikk på Slagmark-minimapet. Trykk H når som helst for alle hurtigtaster.
+  - generic [ref=e13]:
+    - button "Forrige" [disabled] [ref=e14] [cursor=pointer]
+    - button "Neste" [ref=e21] [cursor=pointer]

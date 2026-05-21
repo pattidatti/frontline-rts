@@ -19,9 +19,9 @@ export class MenuScene extends Phaser.Scene {
     const cx = W / 2;
     const cy = H / 2;
 
-    // Bakgrunn — varm gradering matchende HUD-paletten
+    // Bakgrunn — dyp teal gradering matchende HUD-paletten
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0x2a1a10, 0x2a1a10, 0x140a06, 0x080403, 1);
+    bg.fillGradientStyle(0x162e34, 0x162e34, 0x0c1c22, 0x041014, 1);
     bg.fillRect(0, 0, W, H);
 
     // Subtile gress-prikker i kantene (matcher maur-temaet)
@@ -39,26 +39,26 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '64px',
       fontStyle: 'bold',
-      color: '#ffd76a',
+      color: '#ffb547',
     }).setOrigin(0.5).setShadow(0, 4, '#000', 14, true, true);
 
     // Tag-line
     this.add.text(cx, cy - 70, 'Forsvar maurtua. Send soldater i 3 lanes. Overlev 15 bølger.', {
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '18px',
-      color: '#c8b088',
+      color: '#a8c2c6',
     }).setOrigin(0.5);
 
     // Play-knapp — fungerer både ved klikk og Enter/Space
     const btnW = 240, btnH = 64;
     const btnContainer = this.add.container(cx, cy + 20);
-    const btnBg = this.add.rectangle(0, 0, btnW, btnH, 0x6a4a2c)
-      .setStrokeStyle(2, 0xd4a26a, 1);
+    const btnBg = this.add.rectangle(0, 0, btnW, btnH, 0x1f4650)
+      .setStrokeStyle(2, 0xc9a55c, 1);
     const btnLabel = this.add.text(0, 0, '▶  SPILL', {
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '24px',
       fontStyle: 'bold',
-      color: '#ffeaa0',
+      color: '#ffd27a',
     }).setOrigin(0.5);
     btnContainer.add([btnBg, btnLabel]);
     btnContainer.setSize(btnW, btnH);
@@ -68,15 +68,15 @@ export class MenuScene extends Phaser.Scene {
     );
 
     btnContainer.on('pointerover', () => {
-      btnBg.setFillStyle(0x82592e);
-      btnBg.setStrokeStyle(2.5, 0xff9d4a, 1);
-      btnLabel.setColor('#fff5c8');
+      btnBg.setFillStyle(0x266c7a);
+      btnBg.setStrokeStyle(2.5, 0x7dd3c0, 1);
+      btnLabel.setColor('#fff5e0');
       this.input.manager.canvas.style.cursor = 'pointer';
     });
     btnContainer.on('pointerout', () => {
-      btnBg.setFillStyle(0x6a4a2c);
-      btnBg.setStrokeStyle(2, 0xd4a26a, 1);
-      btnLabel.setColor('#ffeaa0');
+      btnBg.setFillStyle(0x1f4650);
+      btnBg.setStrokeStyle(2, 0xc9a55c, 1);
+      btnLabel.setColor('#ffd27a');
       this.input.manager.canvas.style.cursor = '';
     });
     btnContainer.on('pointerdown', () => this.startPlay());
@@ -85,14 +85,14 @@ export class MenuScene extends Phaser.Scene {
     this.add.text(cx, cy + 90, 'Trykk SPACE eller ENTER for å starte', {
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '13px',
-      color: '#8a7858',
+      color: '#6a8488',
     }).setOrigin(0.5);
 
     // Footer
     this.add.text(cx, H - 28, 'WASD / piltaster panorerer • H i spillet viser alle hurtigtaster', {
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '12px',
-      color: '#6a5a3a',
+      color: '#5a7a80',
     }).setOrigin(0.5);
 
     // Pulserende tittel-glød

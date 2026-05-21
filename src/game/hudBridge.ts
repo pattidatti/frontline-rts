@@ -1,92 +1,89 @@
 // Event bridge between the Phaser GameScene and the React HUD overlay.
-// GameScene pushes state snapshots; the HUD sends commands back.
+
+import type { UnitKind } from './config';
 
 export type Faction = 'player' | 'ai' | 'neutral';
 
 export interface HudUnit {
   x: number; y: number;
   faction: Exclude<Faction, 'neutral'>;
-  type: 'worker' | 'soldier';
+  kind: UnitKind;
 }
 
 export interface HudBuilding {
   x: number; y: number; w: number; h: number;
   faction: Faction;
-  kind: 'base' | 'barracks' | 'mine' | 'bridge' | 'tower' | 'farm' | 'wall' | 'armory';
+  kind: 'base' | 'tower';
   hp: number; maxHp: number;
-  /** Kun for mines: hvilken faksjon kontrollerer (eller 'contested'). */
-  control?: 'player' | 'ai' | 'contested' | null;
-  /** Kun for towers: hvilken tower-type. */
   towerType?: TowerKind;
-  /** M3.2 — settes på player-base når Forsvar er kjøpt. */
-  hasDefense?: boolean;
-  /** True hvis bygningen er under konstruksjon (worker bygger den fortsatt). */
-  underConstruction?: boolean;
-  /** Konstruksjonsprogress 0..1; udefinert for ferdige bygninger. */
-  buildProgress?: number;
 }
 
-/** M2.1 — tower-typer */
 export type TowerKind = 'stinger' | 'webber' | 'spitter';
 
-/** M3.1 — bygg-typer (ikke-tower). */
-export type BuildingKind = 'farm' | 'wall' | 'armory' | 'barracks';
+export type BuildKind = TowerKind;
 
-/** M3.1 — alt som kan bygges via build-mode. */
-export type BuildKind = TowerKind | BuildingKind;
-
-/** M2.1 / M3.1 — aktiv build-mode (vises som ghost-preview + status i HUD). */
 export interface HudBuildMode {
   kind: BuildKind;
   cost: number;
   canAfford: boolean;
 }
 
-/** M2.2 — wave-modus status */
 export interface HudWaveState {
-  current: number;       // 1-indeksert
+  current: number;
   total: number;
-  /** ms til neste bølge starter (0 = bølge pågår). */
-  nextInMs: number;
-  /** true når bølge er aktiv (units i spawnet pågår). */
   active: boolean;
-  /** TD: true i prep-fase mellom waves (klar-knapp tilgjengelig). */
-  preparing?: boolean;
-  /** TD: ms igjen av prep-fasen før auto-start. */
-  prepRemainingMs?: number;
-  /** TD: oppsummering av neste bølge (vises i banner). */
-  nextWavePreview?: { soldiers: number; lane: 0 | 1 | 2 | 'all'; tank: boolean; boss: boolean };
-  /** TD: antall creeps igjen som ikke er drept i nåværende bølge. */
+  /** Sann mens spilleren venter på å starte neste bølge (sentrert start-meny vises). */
+  idle?: boolean;
+  /** Sann mens 3-2-1-countdown spiller. */
+  inCountdown?: boolean;
+  countdownRemainingMs?: number;
+  nextWavePreview?: { soldiers: number; lane: 0 | 1 | 2 | 'all'; unitKind: UnitKind; boss: boolean };
+  /** Nummer på den kommende bølgen (vises i start-meny / countdown). */
+  upcomingWaveNumber?: number;
   remainingEnemies?: number;
+  /** Sann mens upgrade-modal vises mellom bølgene. */
+  choosingUpgrade?: boolean;
 }
 
-export interface HudSelection {
-  kind: 'units' | 'building' | 'none';
-  // For 'units':
-  workers?: number;
-  soldiers?: number;
-  // If exactly one unit:
-  singleType?: 'worker' | 'soldier';
-  singleHp?: number;
-  singleMaxHp?: number;
-  /** V5 — kun for single unit: hva enheten gjør akkurat nå (vises som progress / status-tekst). */
-  currentAction?: {
-    type: 'idle' | 'moving' | 'mining' | 'building' | 'attacking';
-    label: string;
-    /** 0..1 hvis aktiviteten har konkret framgang (building). */
-    progress?: number;
-  };
-  // For 'building':
-  building?: HudBuilding;
+export type HudUpgradeRarity = 'common' | 'rare' | 'epic' | 'cursed' | 'silly';
+
+export interface HudUpgradeOption {
+  id: string;
+  name: string;
+  description: string;
+  flavor: string;
+  rarity: HudUpgradeRarity;
+  icon: string;
 }
 
-/** M1.5 — kortvarig HUD-varsel (banner) */
+export interface HudUpgradeChoice {
+  options: HudUpgradeOption[];
+  /** Bølgen som ble nettopp klar — vises i header. */
+  clearedWave: number;
+  /** Tatte upgrade-id-er, til en liten "tagsbar". */
+  taken: { id: string; name: string; icon: string }[];
+}
+
+export interface HudActiveUpgrade {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  rarity: HudUpgradeRarity;
+}
+
+
 export interface HudAlert {
   message: string;
-  /** 'critical' = blinkende rødt, 'warn' = gul */
   urgency: 'critical' | 'warn';
-  /** Tidsstempel (ms) som idempotent-id for animasjon-trigger på HUD-siden. */
   triggeredAt: number;
+}
+
+/** Lane-portal screen-koordinater for HUD å plassere lane-knappene over. */
+export interface HudLanePortal {
+  lane: 0 | 1 | 2;
+  /** Verdens-koordinater for portal-senter. HUD projiserer til skjerm-koord. */
+  worldX: number; worldY: number;
 }
 
 export interface HudState {
@@ -94,67 +91,51 @@ export interface HudState {
   time: number;
   player: {
     gold: number;
-    workers: number;
     soldiers: number;
     baseHp: number; baseMaxHp: number;
-    barracksHp: number; barracksMaxHp: number;
   };
   enemy: {
-    gold: number;
-    workers: number;
     soldiers: number;
     baseHp: number; baseMaxHp: number;
   };
-  costs: { worker: number; soldier: number };
-  selection: HudSelection;
+  costs: Record<UnitKind, number>;
+  /** Unit-typer ut over standard light/medium/heavy som er låst opp via upgrades. */
+  unlockedUnits: UnitKind[];
+  towerCosts: { stinger: number; webber: number; spitter: number };
   map: { width: number; height: number };
-  camera: { x: number; y: number; width: number; height: number };
   minimap: { units: HudUnit[]; buildings: HudBuilding[] };
   stats: {
-    trained: number;
-    goldEarned: number;
-    /** V7 — utvidet stats for game-over panel. */
     soldiersTrained: number;
-    workersTrained: number;
     enemyKills: number;
     unitsLost: number;
-    peakMines: number;
-    aiTowers: number;
+    goldEarned: number;
     playerTowers: number;
   };
+  lanePortals: HudLanePortal[];
+  laneCounts: [number, number, number];
 
-  /** M1.1 — 0 = paused, ellers fra CONFIG.TIME_SCALES. */
   gameSpeed: number;
-  /** M1.5 — siste varsel; HUD viser banneret i ~3 s etter triggeredAt. */
   alert: HudAlert | null;
-
-  /** M2.1 — aktiv build-mode (null = ikke i build-modus). */
   buildMode: HudBuildMode | null;
-  /** M2.2 — wave-modus state (null = klassisk modus). */
   waveMode: HudWaveState | null;
+  upgradeChoice: HudUpgradeChoice | null;
+  activeUpgrades: HudActiveUpgrade[];
 }
 
 export type HudCommand =
-  | { type: 'train'; unit: 'worker' | 'soldier' }
-  | { type: 'select-all-soldiers' }
-  | { type: 'select-all-workers' }
-  | { type: 'clear-selection' }
   | { type: 'restart' }
-  | { type: 'minimap-pan'; x: number; y: number }
-  | { type: 'minimap-attack'; x: number; y: number }
   | { type: 'toggle-pause' }
   | { type: 'cycle-speed' }
   | { type: 'build-tower-start'; tower: TowerKind }
   | { type: 'build-start'; kind: BuildKind }
   | { type: 'build-cancel' }
-  | { type: 'formation' }
-  | { type: 'upgrade-base-defense' }
-  /** V7 — tilbake til MenuScene fra game-over. */
   | { type: 'to-menu' }
-  /** TD — spawn én soldat i valgt lane. */
-  | { type: 'send-lane'; lane: 0 | 1 | 2 }
-  /** TD — hopp over resterende prep-tid og start neste wave. */
-  | { type: 'wave-ready' };
+  /** Spilleren bestiller en spesifikk unit-type i en gitt lane. */
+  | { type: 'send-lane'; lane: 0 | 1 | 2; unitKind: UnitKind }
+  /** Spilleren trykker "Start bølge" — trigger 3-2-1-countdown. */
+  | { type: 'start-wave' }
+  /** Spilleren har valgt én av de tre upgrade-kortene. */
+  | { type: 'select-upgrade'; id: string };
 
 type StateListener = (s: HudState) => void;
 type CommandListener = (c: HudCommand) => void;

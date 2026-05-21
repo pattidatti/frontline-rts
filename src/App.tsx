@@ -9,7 +9,7 @@ export default function App() {
       width: '100vw',
       height: '100vh',
       overflow: 'hidden',
-      background: 'radial-gradient(ellipse at center, #2a1810 0%, #150a06 70%, #080403 100%)',
+      background: 'radial-gradient(ellipse at center, #16282e 0%, #0a1620 70%, #050a10 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',

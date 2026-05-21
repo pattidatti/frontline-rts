@@ -1,0 +1,41 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - generic [ref=e3]:
+        - generic [ref=e4]: FRONTLINE RTS — KONSEPT
+        - heading "Den mørke kolonien" [level=1] [ref=e5]
+        - paragraph [ref=e6]: Isometrisk 3D · sanntid · maur-tema
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - generic [ref=e9]: Tid på døgnet
+          - generic [ref=e10]: Skumring
+        - generic [ref=e11]:
+          - button "Daggry" [ref=e12] [cursor=pointer]
+          - button "Skumring" [ref=e13] [cursor=pointer]
+          - button "Natt" [ref=e14] [cursor=pointer]
+          - button "Auto" [ref=e15] [cursor=pointer]
+        - generic [ref=e16]:
+          - generic [ref=e17]: Kamera
+          - generic [ref=e18]: Roterer
+        - generic [ref=e19]:
+          - button "Fast" [ref=e20] [cursor=pointer]
+          - button "Roter" [ref=e21] [cursor=pointer]
+          - button "Fly-over" [ref=e22] [cursor=pointer]
+        - generic [ref=e23]:
+          - generic [ref=e24]: Bloom
+          - generic [ref=e25]: På
+        - generic [ref=e26]:
+          - button "Skru av/på" [ref=e27] [cursor=pointer]
+          - button "Tåke" [ref=e28] [cursor=pointer]
+          - button "Gress" [ref=e29] [cursor=pointer]
+    - generic:
+      - generic [ref=e31]:
+        - generic [ref=e33]: Mørk koloni (du)
+        - generic [ref=e35]: Rød koloni (AI)
+        - generic [ref=e37]: Bladlus-farm
+        - generic [ref=e39]: Maurtue / tårn
+      - generic [ref=e40]:
+        - generic [ref=e41]: "Maur: —"
+        - generic [ref=e42]: "FPS: —"
+        - generic [ref=e43]: Drag for å panorere · Scroll for zoom · Mellomrom = pause kamera
+  - generic: Vekker kolonien...

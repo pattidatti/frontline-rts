@@ -25,6 +25,7 @@ export class VFXManager {
   private textPool: PoolText[] = [];
   private sparkEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private footprintEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -66,6 +67,16 @@ export class VFXManager {
       tint: THEME.SPARK_TINTS,
       emitting: false,
     }).setDepth(15);
+
+    // Footprint emitter — små svake puffer der maur tråkker
+    this.footprintEmitter = scene.add.particles(0, 0, 'spark', {
+      lifespan: 900,
+      speed: 0,
+      scale: { start: 0.6, end: 1.4 },
+      alpha: { start: 0.32, end: 0 },
+      tint: [0x4a3220, 0x6a5238, 0x3a2614],
+      emitting: false,
+    }).setDepth(2);
 
     // Dust emitter (jordstøv ved død/kollaps)
     this.dustEmitter = scene.add.particles(0, 0, 'spark', {
@@ -121,6 +132,10 @@ export class VFXManager {
     this.dustEmitter.emitParticleAt(x, y, count);
   }
 
+  footprint(x: number, y: number) {
+    this.footprintEmitter.emitParticleAt(x, y, 1);
+  }
+
   floatText(x: number, y: number, msg: string, colorHex: string) {
     const slot = this.textPool.find(t => !t.inUse);
     if (!slot) return;
@@ -138,6 +153,44 @@ export class VFXManager {
         slot.inUse = false;
       },
     });
+  }
+
+  /** Expanding ring at (x, y) — for splash hits, base alarms, etc. */
+  shockwave(x: number, y: number, opts?: { color?: number; radius?: number; thickness?: number; duration?: number }) {
+    const color = opts?.color ?? 0xffe488;
+    const radius = opts?.radius ?? 60;
+    const thickness = opts?.thickness ?? 2.5;
+    const duration = opts?.duration ?? 320;
+    const ring = this.scene.add.circle(x, y, 6, 0, 0)
+      .setStrokeStyle(thickness, color, 1)
+      .setDepth(15)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.scene.tweens.add({
+      targets: ring,
+      radius,
+      alpha: 0,
+      duration,
+      ease: 'Cubic.easeOut',
+      onUpdate: (_t, tgt) => {
+        const c = tgt as Phaser.GameObjects.Arc;
+        c.setStrokeStyle(thickness, color, c.alpha);
+      },
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  /** Continuous smoke plume tied to (x, y). Returns emitter so caller can stop/destroy when no longer needed. */
+  smoke(x: number, y: number): Phaser.GameObjects.Particles.ParticleEmitter {
+    return this.scene.add.particles(x, y, 'spark', {
+      lifespan: 1400,
+      speed: { min: 10, max: 35 },
+      angle: { min: 250, max: 290 },
+      gravityY: -20,
+      scale: { start: 0.6, end: 2.2 },
+      alpha: { start: 0.55, end: 0 },
+      tint: [0x222222, 0x3a2a22, 0x554a3a],
+      frequency: 80,
+    }).setDepth(15);
   }
 
   // Victory/defeat particle rain — call once in endGame; returns the emitter so caller can stop it later if needed.
