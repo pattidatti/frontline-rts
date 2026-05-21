@@ -212,25 +212,26 @@ export const CONFIG = {
   // ───── Waves (TD-modus) ─────
   // `lane` styrer hvor creeps spawner. Må respektere hvilken stage som er aktiv:
   //   waves 1-2 → kun lane 1 (midt)
-  //   waves 3-4 → lane 0 eller 1 (nord/midt)
-  //   waves 5+  → alle laner
+  //   waves 1-4 → lett (light) for å gi spilleren tid til å bygge tårn
+  //   waves 5-6 → medium på én lane (introduksjon)
+  //   waves 7+  → alle laner, eskalerende unit-typer
   WAVE_MODE: {
     enabled: true,
     waves: [
-      { soldiers: 4,  spawnInterval: 1200, lane: 1     as const, unitKind: 'light'  as const, boss: false },
-      { soldiers: 5,  spawnInterval: 1100, lane: 1     as const, unitKind: 'light'  as const, boss: false },
-      { soldiers: 6,  spawnInterval: 1000, lane: 'all' as const, unitKind: 'medium' as const, boss: false },
+      { soldiers: 4,  spawnInterval: 1300, lane: 1     as const, unitKind: 'light'  as const, boss: false },
+      { soldiers: 5,  spawnInterval: 1200, lane: 0     as const, unitKind: 'light'  as const, boss: false },
+      { soldiers: 6,  spawnInterval: 1100, lane: 'all' as const, unitKind: 'light'  as const, boss: false },
+      { soldiers: 7,  spawnInterval: 1050, lane: 2     as const, unitKind: 'light'  as const, boss: false },
+      { soldiers: 6,  spawnInterval: 1000, lane: 1     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 7,  spawnInterval: 950,  lane: 0     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 8,  spawnInterval: 900,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 9,  spawnInterval: 850,  lane: 2     as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 10, spawnInterval: 800,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 11, spawnInterval: 800,  lane: 1     as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 12, spawnInterval: 750,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
-      { soldiers: 13, spawnInterval: 750,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 14, spawnInterval: 700,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
-      { soldiers: 15, spawnInterval: 700,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 16, spawnInterval: 650,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
-      { soldiers: 18, spawnInterval: 650,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
+      { soldiers: 18, spawnInterval: 620,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 20, spawnInterval: 600,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: true },
     ] as ReadonlyArray<{
       soldiers: number; spawnInterval: number;
