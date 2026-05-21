@@ -1418,7 +1418,7 @@ export class GameScene extends Phaser.Scene {
     const base = CONFIG.UNITS[unit.kind].bodyScale * (unit.boss ? 1.5 : 1.0);
     // Stopp tidligere pounce (skala-tweens kan stables) men la idle-bob/vinger leve.
     this.tweens.getTweensOf(unit.antBody)
-      .filter(tw => tw.data.some(d => d.key === 'scaleX' || d.key === 'scaleY'))
+      .filter(tw => (tw.data as Phaser.Tweens.TweenData[]).some(d => d.key === 'scaleX' || d.key === 'scaleY'))
       .forEach(tw => tw.stop());
     unit.antBody.setScale(base);
     this.tweens.add({
@@ -1513,7 +1513,7 @@ export class GameScene extends Phaser.Scene {
     const d = Math.hypot(dx, dy) || 1;
     const kickX = (dx / d) * 4;
     const kickY = (dy / d) * 4;
-    this.tweens.getTweensOf(c).filter(tw => tw.data.some(dd => dd.key === 'x' || dd.key === 'y' || dd.key === 'scaleX')).forEach(tw => tw.stop());
+    this.tweens.getTweensOf(c).filter(tw => (tw.data as Phaser.Tweens.TweenData[]).some(dd => dd.key === 'x' || dd.key === 'y' || dd.key === 'scaleX')).forEach(tw => tw.stop());
     c.setPosition(tower.x + kickX, tower.y + kickY);
     c.setScale(1.12, 0.92);
     this.tweens.add({
@@ -1992,6 +1992,8 @@ export class GameScene extends Phaser.Scene {
         medium: this.unitCostFor('medium'),
         heavy: this.unitCostFor('heavy'),
         sumo: this.unitCostFor('sumo'),
+        wasp: this.unitCostFor('wasp'),
+        termite: this.unitCostFor('termite'),
       },
       unlockedUnits: [...this.modifiers.unlockedUnits],
       towerCosts: {

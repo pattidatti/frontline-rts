@@ -7,7 +7,10 @@ export type UpgradeRarity = 'common' | 'rare' | 'epic' | 'cursed' | 'silly';
 export type UpgradeId =
   | 'queen' | 'sharp_mandibles' | 'fever' | 'mound' | 'granary' | 'looting'
   | 'glass_cannon' | 'sumo' | 'berserk' | 'forge' | 'caffeine' | 'tiny_ants'
-  | 'snake_tongue' | 'explosion' | 'sacrifice';
+  | 'snake_tongue' | 'explosion' | 'sacrifice'
+  | 'wasp_unlock' | 'termite_unlock' | 'clone_spawn' | 'vampire' | 'first_strike'
+  | 'tunnel' | 'adrenaline' | 'cosmic' | 'doomsday' | 'thunderstorm' | 'spore'
+  | 'ant_king';
 
 export interface UpgradeModifiers {
   playerHpMul: number;
