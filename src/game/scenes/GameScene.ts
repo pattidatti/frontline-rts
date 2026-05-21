@@ -216,6 +216,12 @@ export class GameScene extends Phaser.Scene {
     this.playerBase = this.createBase('player', CONFIG.PLAYER_BASE_X, CONFIG.PLAYER_BASE_Y);
     this.enemyBase = this.createEnemyBase(CONFIG.ENEMY_SPAWN_X, CONFIG.ENEMY_SPAWN_Y);
 
+    // ── Gratis start-tårn ────────────────────────────────────────────────
+    const st = CONFIG.FREE_STARTER_TOWER;
+    if (!isOnLaneOrArena(st.x, st.y, this.lanesAll)) {
+      this.createTower(st.type, st.x, st.y);
+    }
+
     // ── Input ────────────────────────────────────────────────────────────
     this.hudCommandUnsub = hudBridge.onCommand((c) => this.handleHudCommand(c));
 
