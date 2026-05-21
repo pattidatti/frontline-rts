@@ -65,6 +65,7 @@ interface BuildingData {
     splash: number;
     slow: number;
     lastFireAt: number;
+    builtCost: number;
   };
 }
 
@@ -653,7 +654,7 @@ export class GameScene extends Phaser.Scene {
     return b;
   }
 
-  private createTower(type: TowerKind, x: number, y: number): BuildingData {
+  private createTower(type: TowerKind, x: number, y: number, builtCost = 0): BuildingData {
     const spec = CONFIG.TOWER_TYPES[type];
     const w = 36, h = 44;
 
@@ -682,6 +683,7 @@ export class GameScene extends Phaser.Scene {
         splash: spec.splash,
         slow: spec.slow,
         lastFireAt: 0,
+        builtCost,
       },
     };
     this.buildings.push(b);
@@ -1643,10 +1645,25 @@ export class GameScene extends Phaser.Scene {
     const cost = this.towerCostFor(kind);
     if (!this.canPlaceTower(kind, w.x, w.y) || this.playerGold < cost) return false;
     this.playerGold -= cost;
-    this.createTower(kind, w.x, w.y);
+    this.createTower(kind, w.x, w.y, cost);
     this.spawnCommandRipple(w.x, w.y, 0xddff88);
     playSfx(this, 'train', { volume: 0.5 });
     return true;
+  }
+
+  private sellTower(b: BuildingData) {
+    if (!b.tower || b.dead || b.hp <= 0) return;
+    const refund = Math.floor(b.tower.builtCost * CONFIG.TOWER_SELL_REFUND);
+    b.dead = true;
+    b.towerContainer?.destroy();
+    b.body.destroy();
+    b.hpBg.destroy();
+    b.hpFg.destroy();
+    if (refund > 0) {
+      this.playerGold += refund;
+      this.vfx.floatText(b.x, b.y - 30, `+${refund}`, '#ffdd66');
+    }
+    this.spawnCommandRipple(b.x, b.y, 0xffaa22);
   }
 
   private spawnCommandRipple(x: number, y: number, color: number) {
@@ -1692,6 +1709,15 @@ export class GameScene extends Phaser.Scene {
         if (placed && !pointer.event.shiftKey) this.cancelBuildMode();
       }
       return;
+    }
+    if (pointer.rightButtonDown()) {
+      const w = this.wp(pointer);
+      const SELL_RADIUS = 40;
+      const target = this.towers.find(t =>
+        !t.dead && t.hp > 0 &&
+        Phaser.Math.Distance.Between(w.x, w.y, t.x, t.y) <= SELL_RADIUS
+      );
+      if (target) this.sellTower(target);
     }
   }
 

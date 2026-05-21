@@ -195,6 +195,7 @@ export const CONFIG = {
     spitter: { cost: 120, hp: 180, damage: 15, range: 160, fireRate: 1800, splash: 60, slow: 0,    color: 0x8acc6a },
   } as const,
   TOWER_SLOW_DURATION: 1800,
+  TOWER_SELL_REFUND: 0.5,   // andel av opprinnelig byggekost refundert ved salg
   AI_TOWER_TARGET: 2,
   AI_TOWER_BUILD_INTERVAL: 60000,
 

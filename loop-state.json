@@ -1,5 +1,5 @@
 {
-  "run": 21,
+  "run": 22,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
@@ -49,12 +49,24 @@
       "gold_at_death": 430,
       "notes": "Wave 4 near-death (50 HP), saved by FORSTERKET TUE → 750 HP heal. Wave 6 lethal. Regression from run 20 (wave 8→6) likely due to upgrade sequence and stage timing. Found bug: wave 2 config said lane 0 (Nord) but Nord not open until wave 3 — WaveStartMenu showed wrong lane. Also wave 4 said lane 2 (Sør) but Sør not open until wave 5. Fixed both.",
       "action": "feature (backlog #2): wave preview threat badges on lane portals. Pulsing red ring + ant-icon badge on portal button when next wave targets that lane. Also fixed wave config: wave 2 lane 0→1 (Midt), wave 4 lane 2→0 (Nord, which opens at wave 3)."
+    },
+    {
+      "run": 22,
+      "mode": "passive + auto-upgrade (click first card each wave, no manual towers/units, only free starter Stinger)",
+      "state": "lost",
+      "game_time": 146,
+      "wave_reached": 5,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 1,
+      "upgrades_taken": ["Forsterket tue (w1)", "Vampyrstikk (w2)", "Maurkongen (w3)", "Vepsesverm (w4)"],
+      "notes": "HP progression: 500→410 (w1) →750 heal→660 (w2) →480 (w3) →270 (w4) →0 (w5). Unlucky upgrade draw — Vampyrstikk+Vepsesverm useless passively. Single Stinger tower kills ~3-4 medium units but 3 slip through wave 5. High variance runs (wave 5-8) due to upgrade RNG. Confirmed: the free starter tower is the only active defense in passive runs.",
+      "action": "feature (backlog #3): tower sell button — right-click a placed tower refunds 50% of builtCost. builtCost stored on tower data at placement time. Free starter tower builtCost=0 so no refund. VFX gold float + orange ripple on sell."
     }
   ],
   "backlog": [
     { "id": 1, "title": "Auto-place starter tower — place 1 free Stinger tower near base at game start to help new players understand tower placement", "status": "done" },
     { "id": 2, "title": "Wave preview arrows — show lane indicators before wave starts so player knows which lanes will be hit", "status": "done" },
-    { "id": 3, "title": "Tower sell button — right-click a placed tower to refund 50% of cost", "status": "pending" },
+    { "id": 3, "title": "Tower sell button — right-click a placed tower to refund 50% of cost", "status": "done" },
     { "id": 4, "title": "Boss visual indicator — special spawn animation + warning banner for boss waves (wave 15)", "status": "pending" },
     { "id": 5, "title": "End screen stats — show waves cleared, towers built, total kills, gold spent on win/loss screen", "status": "pending" }
   ]

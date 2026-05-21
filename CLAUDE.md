@@ -80,6 +80,7 @@ loop-run.sh          ← Entry-skript for cron-loopen
 | Venstreklikk på gress (i build-mode) | Plasser tårn (må være utenfor stier/arena) |
 | Shift+venstreklikk | Plasser tårn uten å gå ut av build-mode |
 | Høyreklikk / ESC (i build-mode) | Avbryt |
+| Høyreklikk på tårn | Selg tårn (refunder 50 % av byggekost) |
 | Klikk upgrade-kort (mellom bølger) | Velg én av tre |
 
 ### Tastatur
