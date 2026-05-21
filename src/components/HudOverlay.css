@@ -1482,6 +1482,52 @@
   50%      { filter: drop-shadow(0 0 8px rgba(255, 200, 100, 0.45)); }
 }
 
+/* ── Bølge-trussel — rød pulserende ring + badge når neste bølge rammer lanen */
+.rts-lane-portal-btn.is-threatened {
+  border-color: #ef4444;
+  animation: rts-portal-wobble 3.2s ease-in-out infinite, rts-portal-threat-glow 0.85s ease-in-out infinite;
+}
+@keyframes rts-portal-threat-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 3px rgba(0, 0, 0, 0.55),
+      0 0 12px rgba(220, 50, 30, 0.5),
+      0 6px 18px rgba(0, 0, 0, 0.7),
+      inset 0 2px 4px rgba(255, 255, 255, 0.32),
+      inset 0 -6px 14px rgba(0, 0, 0, 0.5);
+    border-color: #ef4444;
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(0, 0, 0, 0.55),
+      0 0 28px rgba(240, 70, 40, 0.9),
+      0 8px 22px rgba(0, 0, 0, 0.7),
+      inset 0 2px 4px rgba(255, 255, 255, 0.4),
+      inset 0 -6px 14px rgba(0, 0, 0, 0.5);
+    border-color: #ff8888;
+  }
+}
+.rts-portal-threat {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #c0291a 0%, #7a1208 100%);
+  border: 2px solid #ff8888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: rts-threat-badge-pulse 0.85s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(220, 50, 30, 0.7), 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+@keyframes rts-threat-badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+}
+
 /* ── Backdrop / klikk-fanger — lukker meny ved klikk utenfor.
    Ligger inne i HUD-rotens stacking context (z-index 10) — over canvasen,
    men under topbar (15), build-panel (20), wave-banner og portalene (50).

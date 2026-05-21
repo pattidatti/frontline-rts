@@ -485,6 +485,9 @@ function LanePortals({ s }: { s: HudState }) {
         const hideOthers = openLane !== null && !isOpen;
         if (hideOthers) return null;
         const soldiers = s.laneCounts[portal.lane];
+        const preview = s.waveMode?.nextWavePreview;
+        const isTargeted = !!(s.waveMode?.idle && preview &&
+          (preview.lane === 'all' || preview.lane === portal.lane));
         const centerAngle = LANE_MENU_CENTER_ANGLE[portal.lane];
         const dirMul = LANE_MENU_DIRECTION[portal.lane];
         const n = allOptions.length;
@@ -496,7 +499,7 @@ function LanePortals({ s }: { s: HudState }) {
             style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
           >
             <button
-              className={`rts-lane-portal-btn lane-${portal.lane} ${isOpen ? 'is-active' : ''}`}
+              className={`rts-lane-portal-btn lane-${portal.lane} ${isOpen ? 'is-active' : ''} ${isTargeted ? 'is-threatened' : ''}`}
               onClick={() => setOpenLane(isOpen ? null : portal.lane)}
               title={isOpen ? 'Lukk meny' : `${meta.label}-lane — åpne meny [${meta.hotkey}]`}
             >
@@ -505,6 +508,11 @@ function LanePortals({ s }: { s: HudState }) {
               <span className="rts-portal-count">
                 <AntIcon size={16} kind="medium" /> {soldiers}
               </span>
+              {isTargeted && preview && (
+                <span className="rts-portal-threat" aria-label="Angripes av neste bølge">
+                  <AntIcon size={14} faction="ai" kind={preview.unitKind} />
+                </span>
+              )}
             </button>
             {isOpen && (
               <div className="rts-lane-portal-radial" aria-label={`${meta.label}-meny`}>

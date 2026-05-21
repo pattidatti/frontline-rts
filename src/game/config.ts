@@ -223,9 +223,9 @@ export const CONFIG = {
     enabled: true,
     waves: [
       { soldiers: 4,  spawnInterval: 1300, lane: 1     as const, unitKind: 'light'  as const, boss: false },
-      { soldiers: 5,  spawnInterval: 1200, lane: 0     as const, unitKind: 'light'  as const, boss: false },
+      { soldiers: 5,  spawnInterval: 1200, lane: 1     as const, unitKind: 'light'  as const, boss: false },
       { soldiers: 6,  spawnInterval: 1100, lane: 'all' as const, unitKind: 'light'  as const, boss: false },
-      { soldiers: 7,  spawnInterval: 1050, lane: 2     as const, unitKind: 'light'  as const, boss: false },
+      { soldiers: 7,  spawnInterval: 1050, lane: 0     as const, unitKind: 'light'  as const, boss: false },
       { soldiers: 6,  spawnInterval: 1000, lane: 1     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 7,  spawnInterval: 950,  lane: 0     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 8,  spawnInterval: 900,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
