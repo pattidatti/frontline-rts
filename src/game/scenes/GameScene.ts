@@ -220,9 +220,10 @@ export class GameScene extends Phaser.Scene {
     this.enemyBase = this.createEnemyBase(CONFIG.ENEMY_SPAWN_X, CONFIG.ENEMY_SPAWN_Y);
 
     // ── Gratis start-tårn ────────────────────────────────────────────────
-    const st = CONFIG.FREE_STARTER_TOWER;
-    if (!isOnLaneOrArena(st.x, st.y, this.lanesAll)) {
-      this.createTower(st.type, st.x, st.y);
+    for (const st of CONFIG.FREE_STARTER_TOWERS) {
+      if (!isOnLaneOrArena(st.x, st.y, this.lanesAll)) {
+        this.createTower(st.type, st.x, st.y);
+      }
     }
 
     // ── Input ────────────────────────────────────────────────────────────
