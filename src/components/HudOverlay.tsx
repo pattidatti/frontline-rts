@@ -630,7 +630,7 @@ function GameOver({ s }: { s: HudState }) {
         <div><span>Tid</span><strong>{formatTime(s.time)}</strong></div>
         <div><span>Bølger overlevd</span><strong>{Math.max(0, (s.waveMode?.current ?? 1) - (s.state === 'won' ? 0 : 1))} / {s.waveMode?.total ?? 0}</strong></div>
         <div><span>Soldater sendt</span><strong>{st.soldiersTrained}</strong></div>
-        <div><span>Mat samlet</span><strong>{st.goldEarned}</strong></div>
+        <div><span>Mat brukt</span><strong>{st.goldSpent}</strong></div>
         <div><span>Fiende-drap</span><strong>{st.enemyKills}</strong></div>
         <div><span>Egne tap</span><strong>{st.unitsLost}</strong></div>
         <div><span>Tårn bygget</span><strong>{st.playerTowers}</strong></div>
@@ -802,7 +802,7 @@ function UpgradeChoiceModal({ s }: { s: HudState }) {
     return () => window.removeEventListener('keydown', handler, true);
   }, [choice]);
 
-  if (!choice) return null;
+  if (!choice || s.state !== 'running') return null;
   return (
     <div className="rts-upgrade-overlay" role="dialog" aria-modal="true">
       <div className="rts-upgrade-card-wrap">

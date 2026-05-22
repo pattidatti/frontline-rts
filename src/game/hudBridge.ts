@@ -109,6 +109,7 @@ export interface HudState {
     enemyKills: number;
     unitsLost: number;
     goldEarned: number;
+    goldSpent: number;
     playerTowers: number;
   };
   lanePortals: HudLanePortal[];

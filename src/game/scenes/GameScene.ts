@@ -127,6 +127,7 @@ export class GameScene extends Phaser.Scene {
   private statsEnemyKills = 0;
   private statsUnitsLost = 0;
   private statsGoldEarned = 0;
+  private statsGoldSpent = 0;
 
   private waveManager!: WaveManager;
   private wavesCleared = false;
@@ -173,6 +174,7 @@ export class GameScene extends Phaser.Scene {
     this.statsEnemyKills = 0;
     this.statsUnitsLost = 0;
     this.statsGoldEarned = 0;
+    this.statsGoldSpent = 0;
     this.wavesCleared = false;
     this.currentStageIndex = -1;
     this.laneGfxObjects = [];
@@ -721,6 +723,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.playerGold -= cost;
+    this.statsGoldSpent += cost;
     const cosmicBoss = Math.random() < this.modifiers.cosmicBossChance;
     const unit = this.spawnUnit('player', lane, kind, cosmicBoss);
     this.statsSoldiersTrained++;
@@ -1645,6 +1648,7 @@ export class GameScene extends Phaser.Scene {
     const cost = this.towerCostFor(kind);
     if (!this.canPlaceTower(kind, w.x, w.y) || this.playerGold < cost) return false;
     this.playerGold -= cost;
+    this.statsGoldSpent += cost;
     this.createTower(kind, w.x, w.y, cost);
     this.spawnCommandRipple(w.x, w.y, 0xddff88);
     playSfx(this, 'train', { volume: 0.5 });
@@ -2038,6 +2042,7 @@ export class GameScene extends Phaser.Scene {
       stats: {
         soldiersTrained: this.statsSoldiersTrained,
         goldEarned: this.statsGoldEarned,
+        goldSpent: this.statsGoldSpent,
         enemyKills: this.statsEnemyKills,
         unitsLost: this.statsUnitsLost,
         playerTowers: this.towers.filter(t => !t.dead && t.hp > 0).length,
