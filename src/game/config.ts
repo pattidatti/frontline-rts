@@ -185,11 +185,12 @@ export const CONFIG = {
   // Tårn plasseres i gress-områder (utenfor lane/arena-polygoner).
   TOWER_BUILD_RADIUS: 350,
   TOWER_PLACE_CLEARANCE: 40,
-  // Gratis start-tårn — plasseres automatisk ved spillstart. To tårn: ett mellom nord og midt,
-  // ett mellom midt og sør. Dekker alle 3 laner når de åpner seg.
+  // Gratis start-tårn — plasseres automatisk ved spillstart. Tre tårn: to stingere nord+midt,
+  // én webber mellom midt og sør. Bremser fiender 50% slik at stingerne rekker flere skudd.
   FREE_STARTER_TOWERS: [
     { type: 'stinger' as const, x: 400, y: 440 },  // nord + midt ved x=400
     { type: 'stinger' as const, x: 320, y: 490 },  // nord + midt ved x=320 — andre ildpunkt nærmere basen
+    { type: 'webber'  as const, x: 420, y: 620 },  // midt + sør — slow-sone for bølge 5-7
   ] as const,
   TOWER_TYPES: {
     stinger: { cost: 80,  hp: 200, damage: 25, range: 200, fireRate: 1000, splash: 0,  slow: 0,    color: 0xb89048 },
