@@ -2299,6 +2299,36 @@
   letter-spacing: 0.1em;
 }
 
+/* Boss wave card variant */
+.rts-wave-start-card.boss {
+  border-color: #cc3322;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.7),
+    0 0 48px rgba(200, 50, 30, 0.35),
+    inset 0 1px 0 rgba(255, 100, 80, 0.12);
+}
+
+.rts-wave-start-boss-eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #ff5533;
+  font-weight: 800;
+  text-shadow: 0 0 12px rgba(255, 80, 40, 0.65);
+  animation: rts-boss-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes rts-boss-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.rts-wave-start-btn.boss {
+  background: linear-gradient(180deg, #c83322 0%, #7a1a10 100%);
+  border-color: #ff6644;
+  box-shadow: 0 6px 18px rgba(200, 50, 30, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
 .rts-wave-start-lane {
   opacity: 0.78;
 }
@@ -2412,6 +2442,24 @@
   0%   { transform: scale(0.6); opacity: 0; }
   30%  { transform: scale(1.3); opacity: 1; }
   100% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Boss countdown variant */
+.rts-countdown-overlay.boss {
+  background: radial-gradient(ellipse at center, rgba(30, 5, 3, 0.5) 0%, rgba(0, 0, 0, 0.65) 75%);
+}
+
+.rts-countdown-overlay.boss .rts-countdown-eyebrow {
+  color: #ff5533;
+  text-shadow: 0 0 14px rgba(255, 80, 40, 0.65), 0 2px 8px rgba(0, 0, 0, 0.85);
+  animation: rts-boss-pulse 1.1s ease-in-out infinite;
+}
+
+.rts-countdown-number.boss {
+  color: #ff5533;
+  text-shadow:
+    0 0 36px rgba(255, 80, 40, 0.65),
+    0 8px 20px rgba(0, 0, 0, 0.75);
 }
 
 /* ── Active upgrades strip (nede til venstre) ────────────────────────── */

@@ -866,21 +866,24 @@ function WaveStartMenu({ s }: { s: HudState }) {
     k === 'wasp' ? 'veps' :
     k === 'termite' ? 'termitter' : 'fiender';
 
+  const isBoss = next?.boss === true;
   return (
     <div className="rts-wave-start-overlay" role="dialog" aria-modal="true">
-      <div className="rts-wave-start-card">
-        <div className="rts-wave-start-eyebrow">Klar for neste runde</div>
+      <div className={`rts-wave-start-card${isBoss ? ' boss' : ''}`}>
+        <div className={isBoss ? 'rts-wave-start-boss-eyebrow' : 'rts-wave-start-eyebrow'}>
+          {isBoss ? '⚠ BOSS-BØLGE' : 'Klar for neste runde'}
+        </div>
         <div className="rts-wave-start-title">Bølge {upcoming}<span className="rts-wave-start-total"> / {wave.total}</span></div>
         {next && (
           <div className="rts-wave-start-preview">
             <span><strong>{next.soldiers}</strong> {unitLabel(next.unitKind)}</span>
-            {next.boss && <span className="rts-wave-start-boss">BOSS</span>}
+            {isBoss && <span className="rts-wave-start-boss">BOSS · 4× HP · 2× skade</span>}
             <span className="rts-wave-start-lane">Lane: {laneLabel(next.lane)}</span>
           </div>
         )}
         <button
           type="button"
-          className="rts-wave-start-btn"
+          className={`rts-wave-start-btn${isBoss ? ' boss' : ''}`}
           autoFocus
           onClick={() => hudBridge.sendCommand({ type: 'start-wave' })}
         >
@@ -899,6 +902,7 @@ function CountdownOverlay({ s }: { s: HudState }) {
   const wave = s.waveMode;
   if (!wave || !wave.inCountdown) return null;
   const ms = wave.countdownRemainingMs ?? 0;
+  const isBoss = wave.nextWavePreview?.boss === true;
   // 3000–2001 → "3", 2000–1001 → "2", 1000–1 → "1", ≤0 → "GÅ!"
   let label: string;
   let key: string;
@@ -909,9 +913,11 @@ function CountdownOverlay({ s }: { s: HudState }) {
   const upcoming = wave.upcomingWaveNumber ?? wave.current + 1;
 
   return (
-    <div className="rts-countdown-overlay" aria-live="assertive">
-      <div className="rts-countdown-eyebrow">Bølge {upcoming} starter</div>
-      <div key={key} className={`rts-countdown-number ${label === 'GÅ!' ? 'go' : ''}`}>{label}</div>
+    <div className={`rts-countdown-overlay${isBoss ? ' boss' : ''}`} aria-live="assertive">
+      <div className="rts-countdown-eyebrow">
+        {isBoss ? '⚠ BOSS-BØLGE' : `Bølge ${upcoming} starter`}
+      </div>
+      <div key={key} className={`rts-countdown-number${label === 'GÅ!' ? ' go' : ''}${isBoss && label !== 'GÅ!' ? ' boss' : ''}`}>{label}</div>
     </div>
   );
 }
