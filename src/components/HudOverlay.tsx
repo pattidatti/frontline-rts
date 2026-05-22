@@ -636,6 +636,24 @@ function GameOver({ s }: { s: HudState }) {
         <div><span>Tårn bygget</span><strong>{st.playerTowers}</strong></div>
         <div><span>Base-HP igjen</span><strong>{Math.max(0, s.player.baseHp)}</strong></div>
       </div>
+      {s.activeUpgrades && s.activeUpgrades.length > 0 && (
+        <div className="rts-gameover-upgrades">
+          <div className="rts-gameover-upgrades-title">Upgrades tatt</div>
+          <div className="rts-gameover-upgrades-list">
+            {s.activeUpgrades.map((u) => (
+              <span
+                key={u.id}
+                className={`rts-gameover-upgrade-chip rarity-${u.rarity}`}
+                style={{ ['--rarity-tone' as never]: RARITY_TONES[u.rarity] }}
+                title={u.description}
+              >
+                <span>{u.icon}</span>
+                <span>{u.name}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="rts-gameover-actions">
         <button className="rts-gameover-btn primary" onClick={() => hudBridge.sendCommand({ type: 'restart' })}>
           ↻ Spill igjen <kbd>R</kbd>

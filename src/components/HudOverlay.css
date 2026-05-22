@@ -1113,6 +1113,38 @@
   color: var(--hud-gold-bright);
   font-variant-numeric: tabular-nums;
 }
+.rts-gameover-upgrades {
+  margin: 10px 0 6px;
+  text-align: center;
+}
+.rts-gameover-upgrades-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim, #7ab);
+  margin-bottom: 6px;
+}
+.rts-gameover-upgrades-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+}
+.rts-gameover-upgrade-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--rarity-tone, #9fb3a8) 40%, transparent);
+  background: color-mix(in srgb, var(--rarity-tone, #9fb3a8) 12%, #0a1d22);
+  color: var(--rarity-tone, #9fb3a8);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
 .rts-gameover-actions {
   display: flex;
   gap: 14px;
