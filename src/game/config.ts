@@ -194,7 +194,7 @@ export const CONFIG = {
     { type: 'stinger' as const, x: 300, y: 770 },  // sør — dekker sør-lane-inngang (bølge 8: 9 tunge)
   ] as const,
   TOWER_TYPES: {
-    stinger: { cost: 80,  hp: 200, damage: 25, range: 200, fireRate: 1000, splash: 0,  slow: 0,    color: 0xb89048 },
+    stinger: { cost: 80,  hp: 200, damage: 25, range: 220, fireRate: 1000, splash: 0,  slow: 0,    color: 0xb89048 },
     webber:  { cost: 100, hp: 150, damage: 5,  range: 180, fireRate: 1500, splash: 0,  slow: 0.5,  color: 0xc8c8e8 },
     spitter: { cost: 120, hp: 180, damage: 15, range: 160, fireRate: 1800, splash: 60, slow: 0,    color: 0x8acc6a },
   } as const,
@@ -231,7 +231,7 @@ export const CONFIG = {
       { soldiers: 5,  spawnInterval: 1200, lane: 1     as const, unitKind: 'light'  as const, boss: false },
       { soldiers: 6,  spawnInterval: 1100, lane: 'all' as const, unitKind: 'light'  as const, boss: false },
       { soldiers: 7,  spawnInterval: 1050, lane: 0     as const, unitKind: 'light'  as const, boss: false },
-      { soldiers: 5,  spawnInterval: 1000, lane: 1     as const, unitKind: 'medium' as const, boss: false },
+      { soldiers: 4,  spawnInterval: 1000, lane: 1     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 6,  spawnInterval: 950,  lane: 0     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 6,  spawnInterval: 900,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 7,  spawnInterval: 850,  lane: 2     as const, unitKind: 'heavy'  as const, boss: false },
