@@ -899,6 +899,11 @@ function WaveStartMenu({ s }: { s: HudState }) {
             <span className="rts-wave-start-lane">Lane: {laneLabel(next.lane)}</span>
           </div>
         )}
+        {s.player.gold >= 300 && (
+          <div className="rts-wave-start-gold-nudge">
+            Du har <strong>{s.player.gold}</strong> mat — bygg et tårn! <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd>
+          </div>
+        )}
         <button
           type="button"
           className={`rts-wave-start-btn${isBoss ? ' boss' : ''}`}

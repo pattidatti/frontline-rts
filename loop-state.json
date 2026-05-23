@@ -1,9 +1,9 @@
 {
-  "run": 28,
+  "run": 29,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 280,
+  "avg_duration_last_10": 243,
   "notes": "TD-reset 2026-05-21: RTS-historikk arkivert. Loop kjøres nå mot Frontline TD (15 bølger, tower defense). Mål: passiv run overlever ≥5 bølger; aktiv run vinner 40-60% av ganger.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
@@ -143,6 +143,19 @@
       "upgrades_taken": ["Mutasjon (w1)", "Sopp-spore (w2)", "Slangetunge (w3)", "Sumo-maur (w4)", "Selvoppofring (w5)"],
       "notes": "HP was full 500 through waves 1-4 (best yet). Died wave 6. Bad upgrade draw — all unit/combat upgrades, no HP heal, no tower buff. Regression from run 27 (wave 7) due to upgrade RNG, not tower coverage. 3 free towers (2 Stingers + 1 Webber) are sufficient for waves 1-4 with no damage. Bottleneck: waves 5-7 medium cliff combined with no healing upgrades. Wave 5 (medium Midt) and wave 6 (medium Nord) together drained all remaining HP.",
       "action": "balance (backlog #9): reduce wave 5 from 6→5 medium, wave 6 from 7→6 medium, wave 7 from 8→6 medium all-lanes. Smoother medium ramp reduces upgrade-luck dependency at the critical wave 5-7 cliff. The 8-soldier all-lanes jump was too steep for 3 towers regardless of upgrade draw."
+    },
+    {
+      "run": 29,
+      "mode": "passive + auto-upgrade (first card each wave, no manual towers/units)",
+      "state": "lost",
+      "game_time": 243,
+      "wave_reached": 8,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 6,
+      "gold_at_end": 1732,
+      "towers": 3,
+      "notes": "Best passive run yet — survived waves 1-4 with zero damage, W5 -60 HP, W6 -240 HP, W7 -60 HP, died W8. Wave 8 is 9 heavy units entirely on Sør lane — only the Webber covers Sør (no Stinger there), so 9 heavies slip through. Gold 1732 unspent at death confirms active players are not being nudged to build towers. Rebalance from run 28 was effective: W7 (all-lanes medium) dropped from lethal to -60 HP.",
+      "action": "feature (backlog #10): gold nudge UI in WaveStartMenu. When player has ≥300 mat during idle phase, a pulsing amber box appears between the wave preview and Start button: 'Du har X mat — bygg et tårn! [Q] [W] [E]'. Animates with a subtle glow pulse to draw the eye without being disruptive."
     }
   ],
   "backlog": [
@@ -155,6 +168,7 @@
     { "id": 7, "title": "Second tower slot — give player a second free tower placement to cover more lanes in passive runs, reducing wave-4-5 cliff", "status": "done" },
     { "id": 8, "title": "Wave 4 survival — passive play still dies at wave 4 despite 2 towers. Either reduce wave 4 soldiers (7→5) or increase base HP (500→600), or add a Webber slowtower as 3rd free tower to help stingers kill faster", "status": "done" },
     { "id": 9, "title": "Wave 5-7 medium cliff — smoother ramp needed: 5→6→5 soldiers (was 6→7→8) for medium waves. Passive play dies wave 6-7 due to steep jump when all-lanes wave hits simultaneously.", "status": "done" },
-    { "id": 10, "title": "Active play enablement — passive runs end with 1000+ gold unspent. Consider a gold-nudge UI or tutorial prompt when player has >300 gold and wave is about to start, encouraging tower building.", "status": "pending" }
+    { "id": 10, "title": "Active play enablement — passive runs end with 1000+ gold unspent. Consider a gold-nudge UI or tutorial prompt when player has >300 gold and wave is about to start, encouraging tower building.", "status": "done" },
+    { "id": 11, "title": "Wave 8 Sør coverage — wave 8 is 9 heavy units all on Sør lane, but only a Webber covers Sør (no Stinger). Either add a 4th starter Stinger near Sør or reduce wave 8 soldiers (9→7). Currently the hard wall for passive runs.", "status": "pending" }
   ]
 }
