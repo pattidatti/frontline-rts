@@ -185,12 +185,13 @@ export const CONFIG = {
   // Tårn plasseres i gress-områder (utenfor lane/arena-polygoner).
   TOWER_BUILD_RADIUS: 350,
   TOWER_PLACE_CLEARANCE: 40,
-  // Gratis start-tårn — plasseres automatisk ved spillstart. Tre tårn: to stingere nord+midt,
-  // én webber mellom midt og sør. Bremser fiender 50% slik at stingerne rekker flere skudd.
+  // Gratis start-tårn — plasseres automatisk ved spillstart. Fire tårn: to stingere nord+midt,
+  // én webber mellom midt og sør, én stinger ved sør-lane-inngangen (bølge 8+).
   FREE_STARTER_TOWERS: [
     { type: 'stinger' as const, x: 400, y: 440 },  // nord + midt ved x=400
     { type: 'stinger' as const, x: 320, y: 490 },  // nord + midt ved x=320 — andre ildpunkt nærmere basen
     { type: 'webber'  as const, x: 420, y: 620 },  // midt + sør — slow-sone for bølge 5-7
+    { type: 'stinger' as const, x: 300, y: 770 },  // sør — dekker sør-lane-inngang (bølge 8: 9 tunge)
   ] as const,
   TOWER_TYPES: {
     stinger: { cost: 80,  hp: 200, damage: 25, range: 200, fireRate: 1000, splash: 0,  slow: 0,    color: 0xb89048 },
@@ -233,7 +234,7 @@ export const CONFIG = {
       { soldiers: 5,  spawnInterval: 1000, lane: 1     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 6,  spawnInterval: 950,  lane: 0     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 6,  spawnInterval: 900,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
-      { soldiers: 9,  spawnInterval: 850,  lane: 2     as const, unitKind: 'heavy'  as const, boss: false },
+      { soldiers: 7,  spawnInterval: 850,  lane: 2     as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 10, spawnInterval: 800,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 11, spawnInterval: 800,  lane: 1     as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 12, spawnInterval: 750,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },

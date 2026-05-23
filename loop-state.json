@@ -1,9 +1,9 @@
 {
-  "run": 29,
+  "run": 30,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 243,
+  "avg_duration_last_10": 220,
   "notes": "TD-reset 2026-05-21: RTS-historikk arkivert. Loop kjøres nå mot Frontline TD (15 bølger, tower defense). Mål: passiv run overlever ≥5 bølger; aktiv run vinner 40-60% av ganger.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
@@ -156,6 +156,19 @@
       "towers": 3,
       "notes": "Best passive run yet — survived waves 1-4 with zero damage, W5 -60 HP, W6 -240 HP, W7 -60 HP, died W8. Wave 8 is 9 heavy units entirely on Sør lane — only the Webber covers Sør (no Stinger there), so 9 heavies slip through. Gold 1732 unspent at death confirms active players are not being nudged to build towers. Rebalance from run 28 was effective: W7 (all-lanes medium) dropped from lethal to -60 HP.",
       "action": "feature (backlog #10): gold nudge UI in WaveStartMenu. When player has ≥300 mat during idle phase, a pulsing amber box appears between the wave preview and Start button: 'Du har X mat — bygg et tårn! [Q] [W] [E]'. Animates with a subtle glow pulse to draw the eye without being disruptive."
+    },
+    {
+      "run": 30,
+      "mode": "passive + auto-upgrade (first card each wave, no manual towers/units)",
+      "state": "lost",
+      "game_time": 172,
+      "wave_reached": 5,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 4,
+      "gold_at_end": 932,
+      "towers": 3,
+      "notes": "Died wave 5 (medium Midt). Regression from run 29 (wave 8) due to bad upgrade draw — first card was Eksplosjons-rom (offensive), no HP heal drawn. Wave 1 did 90 HP damage (vs. zero in runs 28-29) — consistent with high-variance upgrade-luck dependency. 932 gold unspent confirms passive players not spending on towers. Wave 8 Sør coverage (backlog #11) not reached this run, but root cause identified in run 29 confirmed: only a Webber covers Sør, insufficient to kill heavy units.",
+      "action": "balance+feature (backlog #11): 4th free Stinger at (300,770) covering Sør-lane entrance. Validates against lane polygon (≈104px from Sør centerline, > 68px exclusion). Also reduced wave 8 from 9→7 heavy units on Sør as belt-and-suspenders. FREE_STARTER_TOWERS array now has 4 entries. Belt-and-suspenders: even with bad upgrade RNG, passive runs should now survive wave 8."
     }
   ],
   "backlog": [
@@ -169,6 +182,7 @@
     { "id": 8, "title": "Wave 4 survival — passive play still dies at wave 4 despite 2 towers. Either reduce wave 4 soldiers (7→5) or increase base HP (500→600), or add a Webber slowtower as 3rd free tower to help stingers kill faster", "status": "done" },
     { "id": 9, "title": "Wave 5-7 medium cliff — smoother ramp needed: 5→6→5 soldiers (was 6→7→8) for medium waves. Passive play dies wave 6-7 due to steep jump when all-lanes wave hits simultaneously.", "status": "done" },
     { "id": 10, "title": "Active play enablement — passive runs end with 1000+ gold unspent. Consider a gold-nudge UI or tutorial prompt when player has >300 gold and wave is about to start, encouraging tower building.", "status": "done" },
-    { "id": 11, "title": "Wave 8 Sør coverage — wave 8 is 9 heavy units all on Sør lane, but only a Webber covers Sør (no Stinger). Either add a 4th starter Stinger near Sør or reduce wave 8 soldiers (9→7). Currently the hard wall for passive runs.", "status": "pending" }
+    { "id": 11, "title": "Wave 8 Sør coverage — wave 8 is 9 heavy units all on Sør lane, but only a Webber covers Sør (no Stinger). Either add a 4th starter Stinger near Sør or reduce wave 8 soldiers (9→7). Currently the hard wall for passive runs.", "status": "done" },
+    { "id": 12, "title": "Wave 5 damage variance — passive runs take 0–90 HP in wave 1 (4 light Midt) and die at wave 5 without HP-heal upgrade. High upgrade-RNG dependency. Consider increasing stinger range 200→220 to ensure Midt units are consistently caught, or reduce wave 5 from 5→4 medium. Goal: wave 5 survivable without HP-heal draw.", "status": "pending" }
   ]
 }
