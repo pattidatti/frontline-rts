@@ -237,7 +237,7 @@ export const CONFIG = {
       { soldiers: 5,  spawnInterval: 900,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 2,  spawnInterval: 850,  lane: 2     as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 8,  spawnInterval: 800,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
-      { soldiers: 11, spawnInterval: 800,  lane: 1     as const, unitKind: 'heavy'  as const, boss: false },
+      { soldiers: 9,  spawnInterval: 800,  lane: 1     as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 12, spawnInterval: 750,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 14, spawnInterval: 700,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 16, spawnInterval: 650,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
