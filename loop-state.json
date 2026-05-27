@@ -1,9 +1,9 @@
 {
-  "run": 43,
+  "run": 44,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 302,
+  "avg_duration_last_10": 358,
   "notes": "TD-reset 2026-05-21: RTS-historikk arkivert. Loop kjøres nå mot Frontline TD (15 bølger, tower defense). Mål: passiv run overlever ≥5 bølger; aktiv run vinner 40-60% av ganger.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
@@ -15,6 +15,19 @@
     "all_15_waves_reachable": false
   },
   "history": [
+    {
+      "run": 44,
+      "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation v2)",
+      "state": "lost",
+      "game_time": 358,
+      "wave_reached": 11,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 3,
+      "gold_at_end": 2352,
+      "towers": 5,
+      "notes": "HP map: W1-W3 zero damage (500), W4 heal upgrade → 750, W4 -60 (690), W5 -60 (630), W6 -120 (510), W7 zero (510), W8 zero (510), W9 (8 medium all) -180 HP (510→330), W10 (3 heavy Midt) -120 HP (330→210), W11 (6 heavy all-lanes) -210 HP dead. W9 high variance confirmed: 0 HP in run 43 vs 180 HP this run — same wave config (8 medium all). Backlog #25 entry HP goal (≥200 HP into W11) achieved at 210 HP. W11 (6 heavy = 2 per lane) still fully lethal from 210 HP. Gold 2352 unspent.",
+      "action": "balance (backlog #26): wave 11 reduced 6→3 heavy all-lanes (1 per lane reduction, established pattern). Also wave 9 reduced 8→6 medium all-lanes (belt-and-suspenders on W9 high variance: 0-180 HP range). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP."
+    },
     {
       "run": 43,
       "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation)",
@@ -373,6 +386,7 @@
     { "id": 22, "title": "Wave 10 still lethal at 7 heavy Midt — run 40 entered W10 with 500 HP (full health!) and still died. 5 free towers cannot handle 7 concentrated heavies on Midt lane. W10 reduced 7→5 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP.", "status": "done" },
     { "id": 23, "title": "Wave 11 bottleneck — run 41 reached W11 with 380 HP (new milestone!) but 12 heavy all-lanes killed base completely. 4 heavy per lane overwhelms 5 free towers. W11 reduced 12→9 heavy all-lanes (1 unit per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "done" },
     { "id": 24, "title": "Wave 10 still lethal at 5 heavy Midt — run 42 entered W10 with 630 HP (lucky heal) but took 480 HP damage (vs 120 HP in run 41 — extreme variance). Without heal upgrade, passive runs die at W10 consistently. W10 reduced 5→3 heavy Midt (2-unit reduction). Goal: passive baseline enters W11 (9 heavy all-lanes) with ≥200 HP regardless of upgrade draw.", "status": "done" },
-    { "id": 25, "title": "Wave 11 bottleneck at 9 heavy all-lanes — run 43 entered W11 with exactly 200 HP (backlog #24 goal achieved) but 9 heavy all-lanes (3 per lane) killed base completely. Also killed 380 HP in run 41. W11 reduced 9→6 heavy all-lanes (1 per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "pending" }
+    { "id": 25, "title": "Wave 11 bottleneck at 9 heavy all-lanes — run 43 entered W11 with exactly 200 HP (backlog #24 goal achieved) but 9 heavy all-lanes (3 per lane) killed base completely. Also killed 380 HP in run 41. W11 reduced 9→6 heavy all-lanes (1 per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "done" },
+    { "id": 26, "title": "Wave 11 still lethal at 6 heavy all-lanes — run 44 entered W11 with 210 HP (goal met) but 6 heavy all-lanes (2 per lane) killed base completely (210 HP in one wave). W9 also showed high variance (0-180 HP: 0 in run 43, 180 in run 44). W11 reduced 6→3 heavy all-lanes (1 per lane). W9 reduced 8→6 medium all-lanes. Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "pending" }
   ]
 }
