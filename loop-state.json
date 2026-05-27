@@ -1,5 +1,5 @@
 {
-  "run": 41,
+  "run": 42,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
@@ -15,6 +15,19 @@
     "all_15_waves_reachable": false
   },
   "history": [
+    {
+      "run": 42,
+      "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation)",
+      "state": "lost",
+      "game_time": 379,
+      "wave_reached": 11,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 6,
+      "gold_at_end": 700,
+      "towers": 5,
+      "notes": "Reached W11 again (tied milestone). HP map: W1-W6 zero damage (500), W7 start 750 (heal upgrade after W6), W8 (2 heavy Sør) -120 HP (750→630), W9 (8 medium all) zero damage (630), W10 (5 heavy Midt) -480 HP (630→150), W11 (9 heavy all-lanes) killed from 150 HP. W10 is the real bottleneck — 5 heavy Midt took 480 HP vs. only 120 HP in run 41 (same wave config!). High variance confirmed: 120-480 HP range for W10. Without heal upgrade, passive runs enter W10 at ~380 HP and die. Backlog #23 (W11 9 heavy) not meaningfully tested since W10 leaves only 150 HP. Gold 700 unspent.",
+      "action": "balance (backlog #24): wave 10 reduced 5→3 heavy Midt. 2-unit reduction because: (1) 5 heavy dealt 480 HP in worst case (vs 120 in run 41 — extreme variance), (2) without heal upgrade passive runs enter W10 at ~380 HP and die even in best case. Goal: passive baseline enters W11 (9 heavy all-lanes) with ≥200 HP regardless of upgrade draw."
+    },
     {
       "run": 41,
       "mode": "passive + auto-upgrade (click first card each wave, 1x speed)",
@@ -345,6 +358,7 @@
     { "id": 20, "title": "Wave 10 bottleneck — run 38 reached W10 with 630 HP but 11 heavy Midt killed base in one wave. W8 (2 heavy Sør) and W9 (8 medium all) both dealt zero damage confirming backlog #19 effective. W10 reduced 11→9 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP.", "status": "done" },
     { "id": 21, "title": "Wave 10 still lethal at 9 heavy Midt — run 39 entered W10 with only 200 HP and died (all-unit-combat upgrade draw, no HP-heal). W10 reduced 9→7 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥100 HP even without HP-heal upgrades.", "status": "done" },
     { "id": 22, "title": "Wave 10 still lethal at 7 heavy Midt — run 40 entered W10 with 500 HP (full health!) and still died. 5 free towers cannot handle 7 concentrated heavies on Midt lane. W10 reduced 7→5 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 23, "title": "Wave 11 bottleneck — run 41 reached W11 with 380 HP (new milestone!) but 12 heavy all-lanes killed base completely. 4 heavy per lane overwhelms 5 free towers. W11 reduced 12→9 heavy all-lanes (1 unit per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "pending" }
+    { "id": 23, "title": "Wave 11 bottleneck — run 41 reached W11 with 380 HP (new milestone!) but 12 heavy all-lanes killed base completely. 4 heavy per lane overwhelms 5 free towers. W11 reduced 12→9 heavy all-lanes (1 unit per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "done" },
+    { "id": 24, "title": "Wave 10 still lethal at 5 heavy Midt — run 42 entered W10 with 630 HP (lucky heal) but took 480 HP damage (vs 120 HP in run 41 — extreme variance). Without heal upgrade, passive runs die at W10 consistently. W10 reduced 5→3 heavy Midt (2-unit reduction). Goal: passive baseline enters W11 (9 heavy all-lanes) with ≥200 HP regardless of upgrade draw.", "status": "pending" }
   ]
 }
