@@ -1,9 +1,9 @@
 {
-  "run": 48,
+  "run": 49,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 368,
+  "avg_duration_last_10": 362,
   "notes": "TD-reset 2026-05-21: RTS-historikk arkivert. Loop kjøres nå mot Frontline TD (15 bølger, tower defense). Mål: passiv run overlever ≥5 bølger; aktiv run vinner 40-60% av ganger.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
@@ -15,6 +15,19 @@
     "all_15_waves_reachable": false
   },
   "history": [
+    {
+      "run": 49,
+      "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation v6)",
+      "state": "lost",
+      "game_time": 311,
+      "wave_reached": 10,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 0,
+      "gold_at_end": 2334,
+      "towers": 5,
+      "notes": "REGRESSION: died wave 10 from high W8 variance. W8 (2 heavy Sør) dealt 120 HP (vs 0 HP in run 48). HP map: W1-W4 zero damage (500), W4→W5 -60 (440), W5-W6 zero (440), W6→W7 -120 (320), W7-W8 zero (320), W8→W9 -120 (200), W9-W10 zero (200), W10 (3 heavy Midt) killed from 200 HP. Backlog #30 (W12: 5 heavy) NOT VALIDATED — run died at W10. W8 (2 heavy Sør) is the unresolved source of high variance: 0 HP in runs 47-48, 120 HP this run. W6 also deals 120 HP consistently. W6+W8=-240 HP cascade leaves only 200 HP entering W10, which is lethal. Gold 2334 unspent.",
+      "action": "balance (backlog #31): wave 8 reduced 2→1 heavy Sør. Eliminates W8 as a damage source. Even 1 heavy has some variance, but 2 heavy proved a lethal cascade trigger when combined with W6 (-120 HP). Goal: passive baseline enters W9 consistently with ≥300 HP (only W4+W6 damage remains), enabling clean W10 and W12 validation."
+    },
     {
       "run": 48,
       "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation v5)",
@@ -443,6 +456,7 @@
     { "id": 27, "title": "Wave 12 bottleneck at 14 heavy all-lanes — run 45 entered W12 with 690 HP (huge surplus from backlog #26) but 14 heavy all-lanes (~5 per lane) dealt 480 HP (690→210). Entered W13 with 210 HP but killed immediately (16 heavy all-lanes). W12 reduced 14→11 heavy all-lanes (1 per lane reduction). Severe jump from W11 (3 heavy) to W12 (14 heavy) needs smoothing. Goal: passive baseline reaches W13 (16 heavy all-lanes) with ≥200 HP.", "status": "done" },
     { "id": 28, "title": "Wave 7 cascade issue — run 46 (no heal upgrade) died at W9: W7 (5 medium all) dealt 180 HP → cascaded into W8 (-120 HP) → entered W9 with only 200 HP (killed). W7 reduced 5→4 medium all-lanes. Backlog #27 (W12: 11 heavy) unvalidated due to early death. Goal: passive baseline survives W7-W9 without heal upgrade, enters W10 with ≥200 HP so W12 validation can happen.", "status": "done" },
     { "id": 29, "title": "Wave 12 bottleneck at 11 heavy all-lanes — run 47 confirmed backlog #28 (W7 zero damage) but W12 (11 heavy all-lanes) killed from 260 HP worst-case entry (no heal: 500 - 120 W8 - 120 W10 = 260 HP). W12 reduced 11→8 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 30, "title": "Wave 12 still lethal at 8 heavy all-lanes — run 48 confirmed worst-case entry at 260 HP (500 - 60 W4 - 120 W6 - 60 W9). W12 (8 heavy all-lanes ≈ 2-3 per lane) killed from 260 HP with all-bad upgrade draw. W12 reduced 8→5 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.", "status": "pending" }
+    { "id": 30, "title": "Wave 12 still lethal at 8 heavy all-lanes — run 48 confirmed worst-case entry at 260 HP (500 - 60 W4 - 120 W6 - 60 W9). W12 (8 heavy all-lanes ≈ 2-3 per lane) killed from 260 HP with all-bad upgrade draw. W12 reduced 8→5 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.", "status": "done" },
+    { "id": 31, "title": "Wave 8 Sør high variance — run 49 showed W8 (2 heavy Sør) dealing 120 HP (vs 0 HP in runs 47-48). Combined with W6 (-120 HP), the cascade W6+W8=-240 HP leaves only 200 HP entering W10, which is lethal (3 heavy Midt). W8 reduced 2→1 heavy Sør. Goal: passive baseline enters W9 consistently with ≥300 HP so W12 (5 heavy all-lanes) can be validated without W8 cascades.", "status": "pending" }
   ]
 }
