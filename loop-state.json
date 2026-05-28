@@ -1,9 +1,9 @@
 {
-  "run": 49,
+  "run": 50,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 362,
+  "avg_duration_last_10": 369,
   "notes": "TD-reset 2026-05-21: RTS-historikk arkivert. Loop kjøres nå mot Frontline TD (15 bølger, tower defense). Mål: passiv run overlever ≥5 bølger; aktiv run vinner 40-60% av ganger.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
@@ -15,6 +15,19 @@
     "all_15_waves_reachable": false
   },
   "history": [
+    {
+      "run": 50,
+      "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation v9)",
+      "state": "lost",
+      "game_time": 404,
+      "wave_reached": 13,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 0,
+      "gold_at_end": 2874,
+      "towers": 5,
+      "notes": "NEW RECORD: first run to reach wave 13. BACKLOG #31 VALIDATED: W8 (1 heavy Sør) = zero damage. HP map: W1-W9 zero damage (500→750 via Forsterket tue heal after W1), W10 (3 heavy Midt) -120 HP (750→630), W11 (3 heavy all-lanes) -120 HP (630→510), W12 (5 heavy all-lanes) -360 HP (510→150), W13 (16 heavy all-lanes) killed from 150 HP. Backlog #30 goal MET with heal upgrade (150 HP entering W13 ≥ goal of 100 HP). W12 is severe: 5 heavy round-robin across 3 lanes (≈2:2:1) dealt 360 HP — towers cannot kill heavies before they reach base. Without heal: worst-case entry at W12 ≈ 20 HP (dead). Upgrades: Forsterket tue/Sopp-spore/Evolusjonshjul/Maurkongen/Bittesmå maur/Termitt-koloni/Eksplosjons-rom/Skarpe mandibler/Vampyrstikk/Mutasjon/Tårnsmed/Fôrlagre. Gold 2874 unspent.",
+      "action": "balance (backlog #32): wave 13 reduced 16→13 heavy all-lanes (1 per lane reduction). 16 heavy killed from 150 HP. Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP."
+    },
     {
       "run": 49,
       "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation v6)",
@@ -457,6 +470,7 @@
     { "id": 28, "title": "Wave 7 cascade issue — run 46 (no heal upgrade) died at W9: W7 (5 medium all) dealt 180 HP → cascaded into W8 (-120 HP) → entered W9 with only 200 HP (killed). W7 reduced 5→4 medium all-lanes. Backlog #27 (W12: 11 heavy) unvalidated due to early death. Goal: passive baseline survives W7-W9 without heal upgrade, enters W10 with ≥200 HP so W12 validation can happen.", "status": "done" },
     { "id": 29, "title": "Wave 12 bottleneck at 11 heavy all-lanes — run 47 confirmed backlog #28 (W7 zero damage) but W12 (11 heavy all-lanes) killed from 260 HP worst-case entry (no heal: 500 - 120 W8 - 120 W10 = 260 HP). W12 reduced 11→8 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.", "status": "done" },
     { "id": 30, "title": "Wave 12 still lethal at 8 heavy all-lanes — run 48 confirmed worst-case entry at 260 HP (500 - 60 W4 - 120 W6 - 60 W9). W12 (8 heavy all-lanes ≈ 2-3 per lane) killed from 260 HP with all-bad upgrade draw. W12 reduced 8→5 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 31, "title": "Wave 8 Sør high variance — run 49 showed W8 (2 heavy Sør) dealing 120 HP (vs 0 HP in runs 47-48). Combined with W6 (-120 HP), the cascade W6+W8=-240 HP leaves only 200 HP entering W10, which is lethal (3 heavy Midt). W8 reduced 2→1 heavy Sør. Goal: passive baseline enters W9 consistently with ≥300 HP so W12 (5 heavy all-lanes) can be validated without W8 cascades.", "status": "pending" }
+    { "id": 31, "title": "Wave 8 Sør high variance — run 49 showed W8 (2 heavy Sør) dealing 120 HP (vs 0 HP in runs 47-48). Combined with W6 (-120 HP), the cascade W6+W8=-240 HP leaves only 200 HP entering W10, which is lethal (3 heavy Midt). W8 reduced 2→1 heavy Sør. Goal: passive baseline enters W9 consistently with ≥300 HP so W12 (5 heavy all-lanes) can be validated without W8 cascades.", "status": "done" },
+    { "id": 32, "title": "Wave 13 new bottleneck — run 50 (NEW RECORD: first to reach W13) died from 150 HP. W12 (5 heavy all-lanes) dealt 360 HP in run 50. W13 (16 heavy all-lanes) killed from 150 HP immediately. W13 reduced 16→13 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP.", "status": "pending" }
   ]
 }
