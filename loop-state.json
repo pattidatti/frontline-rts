@@ -1,9 +1,9 @@
 {
-  "run": 57,
+  "run": 58,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 440,
+  "avg_duration_last_10": 407,
   "notes": "TD-reset 2026-05-21: RTS-historikk arkivert. Loop kjøres nå mot Frontline TD (15 bølger, tower defense). Mål: passiv run overlever ≥5 bølger; aktiv run vinner 40-60% av ganger.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
@@ -15,6 +15,19 @@
     "all_15_waves_reachable": false
   },
   "history": [
+    {
+      "run": 58,
+      "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation v16b)",
+      "state": "lost",
+      "game_time": 525,
+      "wave_reached": 14,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 13,
+      "gold_at_end": 3604,
+      "towers": 5,
+      "notes": "Heal upgrade drawn after W10 (500→750 HP). HP map: W1-W9 zero (500), W10 upgrade heal→750, W10 zero (750), W11 zero (750), W12 (4 heavy all-lanes) -360 HP (750→390) — EXTREME VARIANCE (run 56: 120, run 57: 240, run 58: 360), W13 (4 heavy all-lanes) -240 HP (390→150) — HIGH VARIANCE vs run 57 (0 HP from SAME 390 HP entry), W14 (15 heavy all-lanes) killed from 150 HP (13 soldiers still alive, ~2 heavies cleared base ~75 HP/heavy). Backlog #39 goal NOT MET. Root cause: W12+W13 combined dealt 600 HP from 750 HP base (worst case yet). W13 variance confirmed upgrade-draw dependent: same 4-heavy config, same 390 HP entry, radically different outcome (0 HP run 57 vs 240 HP this run). Gold 3604 unspent.",
+      "action": "balance (backlog #40): wave 13 reduced 4→3 heavy all-lanes (1 per lane reduction). W13 (4 heavy) showed extreme variance (0 HP run 57 vs 240 HP run 58 — same entry HP 390). Must be upgrade-draw dependent on tower DPS. 3 heavy expected worst-case ~120-180 HP. Goal: passive baseline (with Forsterket tue heal) enters W14 (15 heavy all-lanes) with ≥300 HP so W14 leaves ≥100 HP entering W15."
+    },
     {
       "run": 57,
       "mode": "passive + auto-upgrade (first card each wave, 1x speed, JS automation v15)",
@@ -569,6 +582,7 @@
     { "id": 36, "title": "Wave 13 bottleneck at 10 heavy all-lanes — run 54 (no heal, BEST run yet) entered W13 with 380 HP (500 - 120 W12) but 10 heavy all-lanes killed from 380 HP (~38 HP/heavy). W13 reduced 10→7 heavy all-lanes (1 per lane reduction). Goal: passive baseline WITHOUT heal enters W14 (18 heavy all-lanes) with ≥100 HP.", "status": "done" },
     { "id": 37, "title": "Wave 12 extreme variance — run 55 (no heal) entered W12 with 410 HP but W12 (5 heavy all-lanes) dealt 240 HP (vs 120 HP in run 54 — 2× variance). Only 170 HP entered W13 (7 heavy all-lanes, backlog #36 reduction). W13 killed from 170 HP (3 heavies reached base, ~57 HP/heavy). Root cause: W12 worst-case 240 HP makes backlog #36's W13=7 heavy calibration break down. W12 reduced 5→4 heavy all-lanes. Goal: W12 worst-case drops to ~180 HP, ensuring passive baseline (without heal, with up to 90 HP early damage) enters W13 with ≥230 HP so W13 (7 heavy) can be properly evaluated.", "status": "done" },
     { "id": 38, "title": "Wave 13 still lethal at 7 heavy all-lanes — run 56 (heal draw) entered W13 with 360 HP but all 7 heavies cleared base (~51 HP/heavy × 7 = 357 HP). W12 (4 heavy) validated at 120 HP damage this run. W13 reduced 7→4 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 39, "title": "Wave 14 bottleneck at 18 heavy all-lanes — run 57 (heal draw) entered W14 with 390 HP (backlog #38 goal met) but 18 heavy all-lanes killed base from 390 HP (6 reached base ≈65 HP/heavy, 12 still alive). W13 (4 heavy) confirmed zero damage. W12 high variance: 120 HP (run 56) vs 240 HP (run 57) for same 4-heavy config. W14 reduced 18→15 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W15 (20 heavy all-lanes boss) with ≥100 HP.", "status": "pending" }
+    { "id": 39, "title": "Wave 14 bottleneck at 18 heavy all-lanes — run 57 (heal draw) entered W14 with 390 HP (backlog #38 goal met) but 18 heavy all-lanes killed base from 390 HP (6 reached base ≈65 HP/heavy, 12 still alive). W13 (4 heavy) confirmed zero damage. W12 high variance: 120 HP (run 56) vs 240 HP (run 57) for same 4-heavy config. W14 reduced 18→15 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W15 (20 heavy all-lanes boss) with ≥100 HP.", "status": "done" },
+    { "id": 40, "title": "Wave 13 extreme variance at 4 heavy all-lanes — run 58 (heal after W10) entered W13 with 390 HP (same as run 57) but W13 dealt 240 HP (vs 0 HP in run 57 — same config, same entry HP). Combined W12+W13 damage: 600 HP from 750 HP base, leaving only 150 HP for W14. W14 (15 heavy) killed from 150 HP (13 soldiers still alive, ~75 HP/heavy). W13 reduced 4→3 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (15 heavy all-lanes) with ≥300 HP so W14 leaves ≥100 HP entering W15.", "status": "pending" }
   ]
 }
