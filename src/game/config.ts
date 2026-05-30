@@ -242,7 +242,7 @@ export const CONFIG = {
       { soldiers: 4,  spawnInterval: 700,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 3,  spawnInterval: 650,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 9,  spawnInterval: 620,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
-      { soldiers: 20, spawnInterval: 600,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: true },
+      { soldiers: 17, spawnInterval: 600,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: true },
     ] as ReadonlyArray<{
       soldiers: number; spawnInterval: number;
       lane: 0 | 1 | 2 | 'all';
