@@ -1,9 +1,0 @@
-- generic [ref=e8]:
-  - generic [ref=e9]:
-    - generic [ref=e10]: Trinn 1 / 4
-    - button "Hopp over tutorial" [ref=e11] [cursor=pointer]: Hopp over
-  - generic [ref=e12]: Velkommen, Maur-konge!
-  - generic [ref=e13]: Du styrer den mørke kolonien i vest. Målet er å rive fiendebasen i øst. Bruk WASD eller piltaster for å panorere kameraet, eller klikk på Slagmark-minimapet nede til venstre.
-  - generic [ref=e14]:
-    - button "Forrige" [disabled] [ref=e15] [cursor=pointer]
-    - button "Neste" [ref=e21] [cursor=pointer]
