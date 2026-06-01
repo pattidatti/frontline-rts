@@ -1,10 +1,10 @@
 {
-  "run": 67,
+  "run": 69,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 445,
-  "notes": "TD-reset 2026-05-21: RTS-historikk arkivert. Loop kjøres nå mot Frontline TD (15 bølger, tower defense). Mål: passiv run overlever ≥5 bølger; aktiv run vinner 40-60% av ganger.",
+  "avg_duration_last_10": 423,
+  "notes": "TD-balansering. Run 68 isolerte Midt-lane som variance-gulvet (kun webber, ingen stinger). La til 6. gratis stinger dedikert Midt. Neste run måler om midt-lekkasjen er borte.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
   "last_error": null,
@@ -15,6 +15,19 @@
     "all_15_waves_reachable": true
   },
   "history": [
+    {
+      "run": 68,
+      "mode": "passive + auto-upgrade (first card each wave, 3x speed, Playwright in-page driver v32 — base /frontline-rts/, Enter-key start, setInterval auto-clicks .rts-upgrade-card + button.rts-wave-start-btn, records HP-per-wave from #game-metrics)",
+      "state": "lost",
+      "game_time": 340,
+      "wave_reached": 11,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 1,
+      "gold_at_end": 2569,
+      "towers": 5,
+      "notes": "REGRESSION vs run 67 (W15) — heal run (Forsterket tue at W4, 500->750) but heavy early/mid MEDIUM variance + Midt-lane heavy leak. HP map: W1 500, W2 440(-60), W3 380(-60), W4 750(heal), W5 570(-180! 4 medium Midt), W6 450(-120 Nord single-lane), W7 270(-180 4 medium all), W8 270(0 1 heavy Sor), W9 210(-60 6 medium all), W10 90(-120! 2 heavy MIDT — both penetrated ~60 HP), W11 0 (dead, 2 heavy all). ROOT CAUSE isolated: the Midt lane had ONLY a webber (dmg 5, slow) and no stinger — both W5 (4 medium Midt -180) and W10 (2 heavy Midt -120) leaked on Midt specifically. The two top stingers (400,440)/(320,490) lean Nord. Stinger-35 buff (backlog #48) held the Sor heavy (W8 zero) but could not cover Midt. Gold 2569 unspent. Backlog #49 (W15 boss 17->14) untested this run — died at W11. NOTE: run 67 reached W15 because it drew a heal AND had benign W5-W13 (W6-W13 all zero); run 68 shows the variance floor is the un-stingered Midt lane.",
+      "action": "balance (backlog #50): added a 6TH free starter stinger dedicated to the Midt lane at (450,470), in the open Nord/Midt grass wedge, range 220 covering the near-base Midt stretch (x~260-640). This is the exact lever flagged in backlog #48 ('if the Midt leak is the bottleneck, next lever is a 6th free stinger on Midt'). Verified: towers=6 on reload (placement is valid grass, isOnLaneOrArena passes), no console errors, typecheck clean. Goal: eliminate Midt-lane leakage (W5/W7/W9/W10) so a heal run reliably reaches W14-15 and a no-heal run clears the mid-game; isolate whether the W15 boss wave (backlog #49's 14-boss config) is then the true ceiling."
+    },
     {
       "run": 67,
       "mode": "passive + auto-upgrade (first card each wave, 1x speed, Playwright in-page driver v31 — base /frontline-rts/, Enter-key start, setInterval driver: auto-clicks .rts-upgrade-card + button.rts-wave-start-btn, records HP-per-wave from #game-metrics)",
@@ -409,7 +422,12 @@
       "wave_reached": 5,
       "player_base_hp": 0,
       "ai_soldiers_remaining": 1,
-      "upgrades_taken": ["Forsterket tue (w1)", "Vampyrstikk (w2)", "Maurkongen (w3)", "Vepsesverm (w4)"],
+      "upgrades_taken": [
+        "Forsterket tue (w1)",
+        "Vampyrstikk (w2)",
+        "Maurkongen (w3)",
+        "Vepsesverm (w4)"
+      ],
       "notes": "HP progression: 500→410 (w1) →750 heal→660 (w2) →480 (w3) →270 (w4) →0 (w5). Unlucky upgrade draw — Vampyrstikk+Vepsesverm useless passively. Single Stinger tower kills ~3-4 medium units but 3 slip through wave 5. High variance runs (wave 5-8) due to upgrade RNG. Confirmed: the free starter tower is the only active defense in passive runs.",
       "action": "feature (backlog #3): tower sell button — right-click a placed tower refunds 50% of builtCost. builtCost stored on tower data at placement time. Free starter tower builtCost=0 so no refund. VFX gold float + orange ripple on sell."
     },
@@ -421,7 +439,12 @@
       "wave_reached": 4,
       "player_base_hp": 0,
       "ai_soldiers_remaining": 0,
-      "upgrades_taken": ["Maurganger (w1)", "Maurefeber (w2)", "Selvoppofring (w3)", "Forsterket tue (w4)"],
+      "upgrades_taken": [
+        "Maurganger (w1)",
+        "Maurefeber (w2)",
+        "Selvoppofring (w3)",
+        "Forsterket tue (w4)"
+      ],
       "notes": "Upgrades taken: Maurganger (teleport 35% in), Maurefeber (+30% speed), Selvoppofring (death-heal), Forsterket tue (+250 HP, healed to 750). Died wave 5. Metrics showed state=lost with baseHp=750 — snapshot captured right after FORSTERKET TUE heal, before wave 5 damage. Consistent with prior runs: passive play loses at wave 5-8.",
       "action": "feature (backlog #4): boss visual indicator — WaveStartMenu shows red pulsing '⚠ BOSS-BØLGE' eyebrow + red card border + red start button for boss waves. CountdownOverlay shows red numbers + red eyebrow for boss countdown. Normal wave UI unchanged."
     },
@@ -435,7 +458,12 @@
       "ai_soldiers_remaining": 0,
       "gold_at_end": 753,
       "towers": 1,
-      "upgrades_taken": ["Vepsesverm (w1)", "Maurefeber (w2)", "Fôrlagre (w3)", "Tordenstorm (w4)"],
+      "upgrades_taken": [
+        "Vepsesverm (w1)",
+        "Maurefeber (w2)",
+        "Fôrlagre (w3)",
+        "Tordenstorm (w4)"
+      ],
       "notes": "Base HP: 500→440 (w1)→320 (w2)→200 (w3)→0 (w4). Passive play consistently loses wave 4-5. Found bug: upgrade-modal rendered on top of game-over overlay (UpgradeChoiceModal checked !choice but not s.state). Also observed: data-ai-soldiers shows stale '1' in metrics during upgradeChoice phase — not a game bug but a metrics snapshot timing issue.",
       "action": "feature (backlog #5): end screen stats — fixed UpgradeChoiceModal to hide when game is over (added s.state !== 'running' guard). Added goldSpent tracking (units + towers). Updated GameOver component to show 'Mat brukt' instead of 'Mat samlet'. Updated HudState.stats interface with goldSpent field."
     },
@@ -449,7 +477,11 @@
       "ai_soldiers_remaining": 5,
       "gold_at_end": 658,
       "towers": 1,
-      "upgrades_taken": ["Mutasjon (w1)", "Vepsesverm (w2)", "Fôrlagre (w3)"],
+      "upgrades_taken": [
+        "Mutasjon (w1)",
+        "Vepsesverm (w2)",
+        "Fôrlagre (w3)"
+      ],
       "notes": "Third consecutive wave-4 loss. Passive play pattern: starter Stinger buys ~1-2 waves of defense, then base crumbles wave 4-5 without active tower investment. Upgrade RNG is highly variable — no HP-heal draw this run.",
       "action": "feature (backlog #6): active upgrades summary on end screen — added 'UPGRADES TATT' chip list to GameOver component. Each chip shows icon + name with rarity color (--rarity-tone CSS var). Uses existing HudState.activeUpgrades array. Verified visually: chips appear between stats grid and action buttons."
     },
@@ -463,7 +495,11 @@
       "ai_soldiers_remaining": 4,
       "gold_at_end": 658,
       "towers": 1,
-      "upgrades_taken": ["unknown (w1)", "unknown (w2)", "unknown (w3)"],
+      "upgrades_taken": [
+        "unknown (w1)",
+        "unknown (w2)",
+        "unknown (w3)"
+      ],
       "notes": "Fourth consecutive wave-4 loss. HP progression: 500→410 (w1) →260 (w2) →80 (w3) →0 (w4). The lone starter Stinger can't keep up with wave 4 (7 light units on Nord). Identified root cause: second tower placement at (400,620) missed Nord lane entirely (distance 265 > range 200). Corrected to (320,490) which covers both Nord+Midt from a closer position. Verified with test run: HP 500→470 (w1) →350 (w2) →170 (w3) →0 (w4, all enemies cleared). Clear improvement: less damage per wave, base died at wave 4 with ai=0 vs ai=4-5 before.",
       "action": "feature (backlog #7): second free starter Stinger tower at (320,490) in the Nord-Midt gap closer to base. Provides a second fire zone covering both Nord and Midt lanes. FREE_STARTER_TOWER renamed to FREE_STARTER_TOWERS array. GameScene iterates over array. Tower placement validated via isOnLaneOrArena check."
     },
@@ -477,7 +513,12 @@
       "ai_soldiers_remaining": 5,
       "gold_at_end": null,
       "towers": 2,
-      "upgrades_taken": ["Termitt-koloni (w1)", "Tordenstorm (w3)", "Selvoppofring (w5)", "unknown (w6)"],
+      "upgrades_taken": [
+        "Termitt-koloni (w1)",
+        "Tordenstorm (w3)",
+        "Selvoppofring (w5)",
+        "unknown (w6)"
+      ],
       "notes": "MAJOR improvement: survived to wave 7 (was wave 4 in runs 23-26). HP progression: 500 (w1-2) →470 (w3) →470 (w4) →350 (w5) →110 (w6) →0 (w7). Wave 4 now consistently survived thanks to 2nd starter tower. Bottleneck shifted to waves 5-7. Wave 5 (6 medium Midt) cost 120 HP, wave 6 (7 medium Nord) cost 240 HP, wave 7 (8 medium all lanes) killed base. Sør lane (opens wave 5) had zero coverage — wave 7 first wave to hit all 3 simultaneously.",
       "action": "feature (backlog #8): 3rd free starter Webber tower at (420,620) between Midt and Sør lanes. Webber slows enemies 50% for 1800ms, doubling the number of stinger shots on targets passing through. Positioned to cover early Midt path (wave 5) and Sør lane entrance (waves 7+). Config comment updated."
     },
@@ -491,7 +532,13 @@
       "ai_soldiers_remaining": 0,
       "gold_at_end": 1340,
       "towers": 3,
-      "upgrades_taken": ["Mutasjon (w1)", "Sopp-spore (w2)", "Slangetunge (w3)", "Sumo-maur (w4)", "Selvoppofring (w5)"],
+      "upgrades_taken": [
+        "Mutasjon (w1)",
+        "Sopp-spore (w2)",
+        "Slangetunge (w3)",
+        "Sumo-maur (w4)",
+        "Selvoppofring (w5)"
+      ],
       "notes": "HP was full 500 through waves 1-4 (best yet). Died wave 6. Bad upgrade draw — all unit/combat upgrades, no HP heal, no tower buff. Regression from run 27 (wave 7) due to upgrade RNG, not tower coverage. 3 free towers (2 Stingers + 1 Webber) are sufficient for waves 1-4 with no damage. Bottleneck: waves 5-7 medium cliff combined with no healing upgrades. Wave 5 (medium Midt) and wave 6 (medium Nord) together drained all remaining HP.",
       "action": "balance (backlog #9): reduce wave 5 from 6→5 medium, wave 6 from 7→6 medium, wave 7 from 8→6 medium all-lanes. Smoother medium ramp reduces upgrade-luck dependency at the critical wave 5-7 cliff. The 8-soldier all-lanes jump was too steep for 3 towers regardless of upgrade draw."
     },
@@ -531,7 +578,11 @@
       "ai_soldiers_remaining": 0,
       "gold_at_end": 732,
       "towers": 4,
-      "upgrades_taken": ["Maurganger (w1)", "Maurkongen (w2)", "Tårnsmed (w3)"],
+      "upgrades_taken": [
+        "Maurganger (w1)",
+        "Maurkongen (w2)",
+        "Tårnsmed (w3)"
+      ],
       "notes": "Died wave 4. Regression from run 29 (wave 8) and run 30 (wave 5) due to bad upgrade draw — Maurganger+Maurkongen+Tårnsmed gave zero HP healing. Wave 1 did 120 HP damage (500→380), worse than the expected 0-90 range. High upgrade-RNG dependency confirmed: without HP-heal draw (Forsterket tue / Selvoppofring), base crumbles wave 4-5. Backlog #12 root cause validated — stinger range 200 not catching all Midt units before they deal damage.",
       "action": "balance (backlog #12): stinger range 200→220 to ensure earlier engagement on all lanes, reducing damage variance in early waves. Also wave 5 reduced 5→4 medium units (belt-and-suspenders) so wave 5 is survivable even without HP-heal upgrade draw. Goal: passive run baseline wave 5+ without luck dependency."
     },
@@ -558,7 +609,11 @@
       "ai_soldiers_remaining": 3,
       "gold_at_end": 1724,
       "towers": 5,
-      "upgrades_taken": ["Selvoppofring (w1)", "Eksplosjons-rom (w2)", "unknown (w3+)"],
+      "upgrades_taken": [
+        "Selvoppofring (w1)",
+        "Eksplosjons-rom (w2)",
+        "unknown (w3+)"
+      ],
       "notes": "HP map: W1-4 null skade (500), W5 -60 (440), W6 -180 (260), W7 -180 (80), W8 drepte (0). Same wave config as run 33 but very different result — run 33 W5-7 did zero damage; this run they did 420 HP total. Cause: bad upgrade RNG (Selvoppofring + Eksplosjons-rom both useless in passive play — only trigger on player unit death). Confirms high upgrade-variance in waves 6-7. W6 (5 medium Nord) and W7 (6 medium all) are the bottleneck without tower-buff or HP-heal upgrades. W8 (5 heavy Sør): Spitter at (350,800) partially effective but base had only 80 HP entering wave 8. Gold 1724 unspent.",
       "action": "balance (backlog #15): wave 6 reduced 5→4 medium Nord, wave 7 reduced 6→5 medium all-lanes. Matches the pattern of 1-unit reductions used in backlog #9/#12/#13. Goal: passive baseline survives wave 7 even without HP-heal upgrades, enters wave 8 with ≥250 HP. Belt-and-suspenders: 5 free towers + reduced W6/W7 should handle the mid-game cliff without luck dependency."
     },
@@ -572,7 +627,16 @@
       "ai_soldiers_remaining": 3,
       "gold_at_end": 1328,
       "towers": 5,
-      "upgrades_taken": ["Forsterket tue (w1)", "unknown (w2)", "unknown (w3)", "Søsterkull (w4?)", "Embuskemuaar", "Maurkongen", "Liksplyndring", "Slangetunge"],
+      "upgrades_taken": [
+        "Forsterket tue (w1)",
+        "unknown (w2)",
+        "unknown (w3)",
+        "Søsterkull (w4?)",
+        "Embuskemuaar",
+        "Maurkongen",
+        "Liksplyndring",
+        "Slangetunge"
+      ],
       "notes": "CAUTION: first run at 3x speed — may skew results. W2-3 light damage anomalously high (W2:150, W3:210) vs. all prior runs (0-30 HP). Cause unclear: possibly 3x speed affecting Webber slow+Stinger chain timing, or extreme bad RNG (all upgrades useless for passive play). Core findings: (1) died wave 7, confirming runs 33-34 pattern of W7-8 cliff with bad RNG. (2) W8 (5 heavy Sør) never reached — prior runs 33-34 showed it killed base in 1 wave. Goal from backlog #16: reduce W8 5→4 heavy Sør to lower Sør cliff. Future runs should use 1x speed for accurate baseline.",
       "action": "balance (backlog #16): wave 8 reduced 5→4 heavy Sør. Addresses the confirmed Sør-cliff: runs 33-34 both died at wave 8 even with 5 free towers. Reducing by 1 unit follows the established 1-unit-reduction pattern. Goal: passive baseline reaches wave 9 (10 medium all-lanes) with ≥100 HP."
     },
@@ -586,7 +650,16 @@
       "ai_soldiers_remaining": 5,
       "gold_at_end": 2076,
       "towers": 5,
-      "upgrades_taken": ["Krigsraseri (w1)", "Sumo-maur (w2)", "Maurkongen (w3)", "Søsterkull (w4)", "Evolusjonshjul (w5)", "Likplyndring (w6)", "Skarpe mandibler (w7)", "Eksplosjons-rom (w8)"],
+      "upgrades_taken": [
+        "Krigsraseri (w1)",
+        "Sumo-maur (w2)",
+        "Maurkongen (w3)",
+        "Søsterkull (w4)",
+        "Evolusjonshjul (w5)",
+        "Likplyndring (w6)",
+        "Skarpe mandibler (w7)",
+        "Eksplosjons-rom (w8)"
+      ],
       "notes": "FIRST RUN TO REACH WAVE 9 — new milestone. HP map: W1-4 zero damage (500), W4→W5: −60 (440), W5 zero damage, W6 −180 (260), W7 zero damage, W8 −240 (20 HP barely survived!), died W9. W8 (3 heavy Sør) still deals 240 HP — leaves only 20 HP entering W9. All upgrades useless for passive play (no HP-heal, no tower-buff draw). Gold 2076 unspent. Backlog #18 goal (enter W9) achieved; goal of ≥200 HP at W9 start not yet met.",
       "action": "balance (backlog #19): wave 8 reduced 3→2 heavy Sør + wave 9 reduced 10→8 medium all-lanes. W8 still the cliff: 3 heavy dealt 240 HP leaving only 20 HP at W9. Goal: passive baseline enters W9 with ≥100 HP, and W9 (8 medium all-lanes) more survivable with 5 free towers."
     },
@@ -600,7 +673,11 @@
       "ai_soldiers_remaining": 1,
       "gold_at_end": null,
       "towers": 5,
-      "upgrades_taken": ["Evolusjonshjul (w4)", "Krigsdronning (w5)", "Termitt-koloni (w6)"],
+      "upgrades_taken": [
+        "Evolusjonshjul (w4)",
+        "Krigsdronning (w5)",
+        "Termitt-koloni (w6)"
+      ],
       "notes": "HP map: W1-4 zero damage (500), W5 -60 (440), W6 -120 (320), W7 zero damage (320), W8 -320 dead. Confirms W7 reductions from backlog #15 working (zero damage). W8 (4 heavy Sør) kills base from 320 HP with bad upgrade draw — neither Krigsdronning nor Termitt-koloni provide HP-heal or tower-buff in passive play. Upgrade-RNG dependency confirmed: passive baseline needs to survive W8 without luck. Sør tower pair (Stinger 300,770 + Spitter 350,800) insufficient against 4 heavy units without Webber slow chain confirming. Note: run 35 3x-speed anomaly not seen this run — W2-3 both at zero damage confirms 1x speed is reliable baseline.",
       "action": "balance (backlog #18): wave 8 reduced 4→3 heavy Sør. Established 1-unit-reduction pattern. Goal: passive baseline enters wave 9 (10 medium all-lanes) with ≥200 HP regardless of upgrade draw."
     },
@@ -614,7 +691,17 @@
       "ai_soldiers_remaining": 7,
       "gold_at_end": 2204,
       "towers": 5,
-      "upgrades_taken": ["Skarpe mandibler (w1)", "Eksplosjons-rom (w2)", "Bittesmå maur (w3)", "Tårnsmed (w4)", "Vepsesverm (w5)", "Maurefeber (w6)", "Selvoppofring (w7)", "Maur-på-koffein (w8)", "Maurganger (w9)"],
+      "upgrades_taken": [
+        "Skarpe mandibler (w1)",
+        "Eksplosjons-rom (w2)",
+        "Bittesmå maur (w3)",
+        "Tårnsmed (w4)",
+        "Vepsesverm (w5)",
+        "Maurefeber (w6)",
+        "Selvoppofring (w7)",
+        "Maur-på-koffein (w8)",
+        "Maurganger (w9)"
+      ],
       "notes": "W10 still the bottleneck after backlog #20 (9 heavy Midt). HP map: W1-5 zero damage (500), W6+W7 combined -120 HP (380 entering W8), W8 -120 HP (380→260), W9 -60 HP (260→200), W10 -200+ dead. W10 (9 heavy Midt) killed from 200 HP — single Midt Stinger cannot handle 9 concentrated heavies. Bad upgrade draw (all unit-combat, no HP-heal, no tower-buff). W8 variance noted: 0 HP in run 38 vs -120 HP this run — inconsistent coverage on Sør. Gold 2204 unspent.",
       "action": "balance (backlog #21): wave 10 reduced 9→7 heavy Midt. 2-unit reduction follows backlog #20 pattern. 9 heavy overwhelmed Midt coverage from 200 HP. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥100 HP."
     },
@@ -628,7 +715,16 @@
       "ai_soldiers_remaining": 1,
       "gold_at_end": null,
       "towers": 5,
-      "upgrades_taken": ["Tordenstorm (w2)", "Likplyndring (w3)", "Søsterkull (w4)", "Berserkergang (w5)", "Tårnsmed (w6)", "Glasskanoner (w7)", "Krigsdronning (w8)", "Maur-på-koffein (w9)"],
+      "upgrades_taken": [
+        "Tordenstorm (w2)",
+        "Likplyndring (w3)",
+        "Søsterkull (w4)",
+        "Berserkergang (w5)",
+        "Tårnsmed (w6)",
+        "Glasskanoner (w7)",
+        "Krigsdronning (w8)",
+        "Maur-på-koffein (w9)"
+      ],
       "notes": "BEST PASSIVE RUN: zero damage through waves 1-9 (HP 500 all the way). Entered W10 with full 500 HP. W10 (7 heavy Midt) killed from 500 HP — even full-health passive run cannot survive 7 concentrated heavies on Midt. 5 free towers insufficient for W10 regardless of upgrade draw. Gold high and unspent. Confirms W10 is hardcoded bottleneck independent of upgrade RNG.",
       "action": "balance (backlog #22): wave 10 reduced 7→5 heavy Midt. 2-unit reduction because 7 heavies killed from 500 HP (full health) — independent of upgrade luck. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP."
     },
@@ -642,7 +738,16 @@
       "ai_soldiers_remaining": 5,
       "gold_at_end": 2451,
       "towers": 5,
-      "upgrades_taken": ["Skarpe mandibler (w2)", "Selvoppofring (w3)", "Forsterket tue (w4)", "Krigsraseri (w5)", "Tordenstorm (w6)", "Fôrlagre (w7)", "Berserkergang (w8)", "Likplyndring (w9)"],
+      "upgrades_taken": [
+        "Skarpe mandibler (w2)",
+        "Selvoppofring (w3)",
+        "Forsterket tue (w4)",
+        "Krigsraseri (w5)",
+        "Tordenstorm (w6)",
+        "Fôrlagre (w7)",
+        "Berserkergang (w8)",
+        "Likplyndring (w9)"
+      ],
       "notes": "NEW MILESTONE: reached wave 10. HP map: W1-3 zero damage (500), W4 -60 (440), W5 Forsterket tue healed to 750, W6 -60 (690), W7 -60 (630), W8 ZERO (2 heavy Sør ✓ backlog #19), W9 ZERO (8 medium all ✓ backlog #19), W10 -630 dead. W10 (11 heavy Midt) overwhelmed Midt stingers killing from 630 HP. All upgrades combat-oriented/useless for passive play except Forsterket tue. Both backlog #19 reductions confirmed highly effective: W8+W9 both zero damage. Gold 2451 unspent.",
       "action": "balance (backlog #20): wave 10 reduced 11→9 heavy Midt. 2-unit reduction because 11 concentrated heavy on a single lane is a severe spike — killed 630 HP in one wave. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP."
     },
@@ -661,54 +766,255 @@
     }
   ],
   "backlog": [
-    { "id": 1, "title": "Auto-place starter tower — place 1 free Stinger tower near base at game start to help new players understand tower placement", "status": "done" },
-    { "id": 2, "title": "Wave preview arrows — show lane indicators before wave starts so player knows which lanes will be hit", "status": "done" },
-    { "id": 3, "title": "Tower sell button — right-click a placed tower to refund 50% of cost", "status": "done" },
-    { "id": 4, "title": "Boss visual indicator — special spawn animation + warning banner for boss waves (wave 15)", "status": "done" },
-    { "id": 5, "title": "End screen stats — show waves cleared, towers built, total kills, gold spent on win/loss screen", "status": "done" },
-    { "id": 6, "title": "Active upgrades summary on end screen — list which upgrades were taken so player can review their build after death", "status": "done" },
-    { "id": 7, "title": "Second tower slot — give player a second free tower placement to cover more lanes in passive runs, reducing wave-4-5 cliff", "status": "done" },
-    { "id": 8, "title": "Wave 4 survival — passive play still dies at wave 4 despite 2 towers. Either reduce wave 4 soldiers (7→5) or increase base HP (500→600), or add a Webber slowtower as 3rd free tower to help stingers kill faster", "status": "done" },
-    { "id": 9, "title": "Wave 5-7 medium cliff — smoother ramp needed: 5→6→5 soldiers (was 6→7→8) for medium waves. Passive play dies wave 6-7 due to steep jump when all-lanes wave hits simultaneously.", "status": "done" },
-    { "id": 10, "title": "Active play enablement — passive runs end with 1000+ gold unspent. Consider a gold-nudge UI or tutorial prompt when player has >300 gold and wave is about to start, encouraging tower building.", "status": "done" },
-    { "id": 11, "title": "Wave 8 Sør coverage — wave 8 is 9 heavy units all on Sør lane, but only a Webber covers Sør (no Stinger). Either add a 4th starter Stinger near Sør or reduce wave 8 soldiers (9→7). Currently the hard wall for passive runs.", "status": "done" },
-    { "id": 12, "title": "Wave 5 damage variance — passive runs take 0–90 HP in wave 1 (4 light Midt) and die at wave 5 without HP-heal upgrade. High upgrade-RNG dependency. Consider increasing stinger range 200→220 to ensure Midt units are consistently caught, or reduce wave 5 from 5→4 medium. Goal: wave 5 survivable without HP-heal draw.", "status": "done" },
-    { "id": 13, "title": "Wave 6-7 survival — with stinger range 220 and wave 5 at 4 medium, passive runs should survive to wave 6+. Next bottleneck: wave 6 (6 medium Nord) + wave 7 (6 medium all-lanes). Monitor if passive baseline moves from wave 4 to wave 6-7 range. If still dying at wave 5, consider reducing wave 6 or adding a Spitter tower as 5th free starter.", "status": "done" },
-    { "id": 14, "title": "Wave 8 Sør heavy cliff — 6 heavy Sør overwhelms 1 Stinger + 1 Webber. Added 5th free Spitter at (350,800) for splash AoE + reduced wave 8 6→5 heavy.", "status": "done" },
-    { "id": 15, "title": "Wave 6-7 mid-game cliff — W6 (5 medium Nord) and W7 (6 medium all) caused -360 HP total in run 34 with bad upgrades. Reduced W6 5→4 and W7 6→5 to smooth ramp. Goal: passive baseline survives wave 7 with ≥250 HP regardless of upgrade draw.", "status": "done" },
-    { "id": 16, "title": "Wave 8-9 survival — with W6/W7 reductions, passive baseline should enter wave 8 with ≥250 HP. Monitor if 5 free towers (2 Stinger Nord, Webber Midt/Sør, Stinger Sør, Spitter Sør) handle wave 8 (5 heavy Sør) and wave 9 (10 medium all-lanes = ~3-4 per lane). If still dying at wave 8, consider reducing W8 to 4 heavy or repositioning Spitter. If wave 9 is new bottleneck, reduce 10→8 medium or add 6th free tower.", "status": "done" },
-    { "id": 17, "title": "Wave 9 survival — W8 reduced to 4 heavy Sør. Monitor if passive baseline reaches wave 9 (10 medium all-lanes). If 10 medium all-lanes (~3-4 per lane) kills base, reduce to 8 or add 6th free tower (Stinger/Spitter) on Midt. Also investigate anomalous early-wave damage seen in run 35 (3x speed): run future tests at 1x speed to confirm W2-3 are still handled by 5 towers with 0 damage.", "status": "done" },
-    { "id": 18, "title": "Wave 8 Sør cliff (again) — run 36 with 4 heavy Sør killed base from 320 HP with bad upgrade draw (Krigsdronning+Termitt-koloni). W8 reduced 4→3 heavy Sør. Follows established 1-unit-reduction pattern. Goal: passive baseline enters wave 9 with ≥200 HP regardless of upgrade RNG.", "status": "done" },
-    { "id": 19, "title": "Wave 8-9 cliff — run 37 first to reach W9 but only 20 HP entering it. W8 (3 heavy) dealt 240 HP; W9 (10 medium all-lanes) immediately killed. W8 reduced 3→2 heavy Sør + W9 reduced 10→8 medium all-lanes. Goal: passive baseline enters W9 with ≥100 HP and W9 survivable with 5 free towers even with bad upgrade RNG.", "status": "done" },
-    { "id": 20, "title": "Wave 10 bottleneck — run 38 reached W10 with 630 HP but 11 heavy Midt killed base in one wave. W8 (2 heavy Sør) and W9 (8 medium all) both dealt zero damage confirming backlog #19 effective. W10 reduced 11→9 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 21, "title": "Wave 10 still lethal at 9 heavy Midt — run 39 entered W10 with only 200 HP and died (all-unit-combat upgrade draw, no HP-heal). W10 reduced 9→7 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥100 HP even without HP-heal upgrades.", "status": "done" },
-    { "id": 22, "title": "Wave 10 still lethal at 7 heavy Midt — run 40 entered W10 with 500 HP (full health!) and still died. 5 free towers cannot handle 7 concentrated heavies on Midt lane. W10 reduced 7→5 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 23, "title": "Wave 11 bottleneck — run 41 reached W11 with 380 HP (new milestone!) but 12 heavy all-lanes killed base completely. 4 heavy per lane overwhelms 5 free towers. W11 reduced 12→9 heavy all-lanes (1 unit per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 24, "title": "Wave 10 still lethal at 5 heavy Midt — run 42 entered W10 with 630 HP (lucky heal) but took 480 HP damage (vs 120 HP in run 41 — extreme variance). Without heal upgrade, passive runs die at W10 consistently. W10 reduced 5→3 heavy Midt (2-unit reduction). Goal: passive baseline enters W11 (9 heavy all-lanes) with ≥200 HP regardless of upgrade draw.", "status": "done" },
-    { "id": 25, "title": "Wave 11 bottleneck at 9 heavy all-lanes — run 43 entered W11 with exactly 200 HP (backlog #24 goal achieved) but 9 heavy all-lanes (3 per lane) killed base completely. Also killed 380 HP in run 41. W11 reduced 9→6 heavy all-lanes (1 per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 26, "title": "Wave 11 still lethal at 6 heavy all-lanes — run 44 entered W11 with 210 HP (goal met) but 6 heavy all-lanes (2 per lane) killed base completely (210 HP in one wave). W9 also showed high variance (0-180 HP: 0 in run 43, 180 in run 44). W11 reduced 6→3 heavy all-lanes (1 per lane). W9 reduced 8→6 medium all-lanes. Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 27, "title": "Wave 12 bottleneck at 14 heavy all-lanes — run 45 entered W12 with 690 HP (huge surplus from backlog #26) but 14 heavy all-lanes (~5 per lane) dealt 480 HP (690→210). Entered W13 with 210 HP but killed immediately (16 heavy all-lanes). W12 reduced 14→11 heavy all-lanes (1 per lane reduction). Severe jump from W11 (3 heavy) to W12 (14 heavy) needs smoothing. Goal: passive baseline reaches W13 (16 heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 28, "title": "Wave 7 cascade issue — run 46 (no heal upgrade) died at W9: W7 (5 medium all) dealt 180 HP → cascaded into W8 (-120 HP) → entered W9 with only 200 HP (killed). W7 reduced 5→4 medium all-lanes. Backlog #27 (W12: 11 heavy) unvalidated due to early death. Goal: passive baseline survives W7-W9 without heal upgrade, enters W10 with ≥200 HP so W12 validation can happen.", "status": "done" },
-    { "id": 29, "title": "Wave 12 bottleneck at 11 heavy all-lanes — run 47 confirmed backlog #28 (W7 zero damage) but W12 (11 heavy all-lanes) killed from 260 HP worst-case entry (no heal: 500 - 120 W8 - 120 W10 = 260 HP). W12 reduced 11→8 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 30, "title": "Wave 12 still lethal at 8 heavy all-lanes — run 48 confirmed worst-case entry at 260 HP (500 - 60 W4 - 120 W6 - 60 W9). W12 (8 heavy all-lanes ≈ 2-3 per lane) killed from 260 HP with all-bad upgrade draw. W12 reduced 8→5 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 31, "title": "Wave 8 Sør high variance — run 49 showed W8 (2 heavy Sør) dealing 120 HP (vs 0 HP in runs 47-48). Combined with W6 (-120 HP), the cascade W6+W8=-240 HP leaves only 200 HP entering W10, which is lethal (3 heavy Midt). W8 reduced 2→1 heavy Sør. Goal: passive baseline enters W9 consistently with ≥300 HP so W12 (5 heavy all-lanes) can be validated without W8 cascades.", "status": "done" },
-    { "id": 32, "title": "Wave 13 new bottleneck — run 50 (NEW RECORD: first to reach W13) died from 150 HP. W12 (5 heavy all-lanes) dealt 360 HP in run 50. W13 (16 heavy all-lanes) killed from 150 HP immediately. W13 reduced 16→13 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 33, "title": "Wave 13 still lethal at 13 heavy all-lanes — run 51 entered W13 with 510 HP (far better entry than run 50's 150 HP) but 13 heavy all-lanes killed base completely. W13 reduced 13→10 heavy all-lanes (1 per lane reduction). High W12 variance noted: 120 HP in run 51 vs 360 HP in run 50 for same 5 heavy config. Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 34, "title": "Wave 10 extreme variance — run 52 (no heal upgrade) entered W10 with 320 HP but W10 (3 heavy Midt) dealt 240 HP, leaving only 80 HP for W11. W10 variance range: 60-240 HP for same 3 heavy config. W10 reduced 3→2 heavy Midt. Goal: passive baseline WITHOUT heal upgrade survives W10-W11 and enters W12 (5 heavy all-lanes) with ≥200 HP so W13 (10 heavy, backlog #33 change) can be validated.", "status": "done" },
-    { "id": 35, "title": "Wave 11 bottleneck at 3 heavy all-lanes — run 53 (no heal) entered W11 with 290 HP but 3 heavy all-lanes (1/lane round-robin) dealt 240 HP (80 HP/heavy avg = ~2 base attacks each before towers finish). W11 reduced 3→2 heavy all-lanes. Goal: passive baseline WITHOUT heal enters W12 (5 heavy all-lanes) with ≥150 HP.", "status": "done" },
-    { "id": 36, "title": "Wave 13 bottleneck at 10 heavy all-lanes — run 54 (no heal, BEST run yet) entered W13 with 380 HP (500 - 120 W12) but 10 heavy all-lanes killed from 380 HP (~38 HP/heavy). W13 reduced 10→7 heavy all-lanes (1 per lane reduction). Goal: passive baseline WITHOUT heal enters W14 (18 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 37, "title": "Wave 12 extreme variance — run 55 (no heal) entered W12 with 410 HP but W12 (5 heavy all-lanes) dealt 240 HP (vs 120 HP in run 54 — 2× variance). Only 170 HP entered W13 (7 heavy all-lanes, backlog #36 reduction). W13 killed from 170 HP (3 heavies reached base, ~57 HP/heavy). Root cause: W12 worst-case 240 HP makes backlog #36's W13=7 heavy calibration break down. W12 reduced 5→4 heavy all-lanes. Goal: W12 worst-case drops to ~180 HP, ensuring passive baseline (without heal, with up to 90 HP early damage) enters W13 with ≥230 HP so W13 (7 heavy) can be properly evaluated.", "status": "done" },
-    { "id": 38, "title": "Wave 13 still lethal at 7 heavy all-lanes — run 56 (heal draw) entered W13 with 360 HP but all 7 heavies cleared base (~51 HP/heavy × 7 = 357 HP). W12 (4 heavy) validated at 120 HP damage this run. W13 reduced 7→4 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP.", "status": "done" },
-    { "id": 39, "title": "Wave 14 bottleneck at 18 heavy all-lanes — run 57 (heal draw) entered W14 with 390 HP (backlog #38 goal met) but 18 heavy all-lanes killed base from 390 HP (6 reached base ≈65 HP/heavy, 12 still alive). W13 (4 heavy) confirmed zero damage. W12 high variance: 120 HP (run 56) vs 240 HP (run 57) for same 4-heavy config. W14 reduced 18→15 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W15 (20 heavy all-lanes boss) with ≥100 HP.", "status": "done" },
-    { "id": 40, "title": "Wave 13 extreme variance at 4 heavy all-lanes — run 58 (heal after W10) entered W13 with 390 HP (same as run 57) but W13 dealt 240 HP (vs 0 HP in run 57 — same config, same entry HP). Combined W12+W13 damage: 600 HP from 750 HP base, leaving only 150 HP for W14. W14 (15 heavy) killed from 150 HP (13 soldiers still alive, ~75 HP/heavy). W13 reduced 4→3 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (15 heavy all-lanes) with ≥300 HP so W14 leaves ≥100 HP entering W15.", "status": "done" },
-    { "id": 41, "title": "Wave 14 still lethal at 15 heavy all-lanes — run 59 (heal draw) entered W14 with 510 HP (backlog #40 goal met) but 15 heavy killed base completely (6 reached base ≈85 HP/heavy, 9 still alive). W12+W13 both zero damage this run (very favorable). W14 reduced 15→12 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W15 (20 heavy boss) with ≥100 HP.", "status": "done" },
-    { "id": 42, "title": "Wave 14 still lethal at 12 heavy all-lanes — run 60 (no-heal worst case) entered W14 with 320 HP, died (8/12 alive, ~4 cleared base ≈80 HP/heavy). Consistent with run 59 (~85 HP/heavy). W14 reduced 12→9 heavy all-lanes (1 per lane reduction). Expected with-heal entry ~570–630 HP; with 9 heavy ~3 reach base (~240 HP damage) → enter W15 with ≥200 HP. Goal: passive baseline (with Forsterket tue heal) enters W15 (20 heavy boss) with ≥200 HP so W15 boss mechanics can be tested.", "status": "done" },
-    { "id": 43, "title": "Wave 15 first tested — run 61 (FIRST TO REACH W15, best-case: heal after W10 + zero W12/W13) entered W15 with 270 HP but 20 boss heavies (4× HP=1000, 2× dmg=80) killed from 270 HP with 12/20 still alive. Towers killed 8 bosses, ~3 cleared base (~90 HP/boss). W15 reduced 20→17 boss heavy all-lanes (1 per lane reduction). Goal: calibrate W15 boss count so passive run damage profile is measurable; active play should eventually be able to win W15.", "status": "done" },
-    { "id": 44, "title": "Wave 12 extreme variance at 4 heavy all-lanes — run 62 (no-heal) entered W12 with 380 HP but W12 dealt 240 HP (worst-case), leaving only 140 HP for W13 (3 heavy all-lanes). W13 killed from 140 HP (all 3 cleared base ~47 HP/heavy). W12 worst-case 240 HP confirmed 3 runs (57/58/62). W12 reduced 4→3 heavy all-lanes. Goal: passive baseline (no-heal, worst case) enters W14 (9 heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 45, "title": "Wave 14 bottleneck at 9 heavy all-lanes — run 63 (heal draw) entered W14 with 690 HP but W14 killed from 690 HP (7/9 reached base ≈98 HP/heavy, only 2 killed by towers — 22% kill rate). W12+W13 both zero (backlog #44 fully confirmed). W14 reduced 9→6 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W15 (17 boss heavy all-lanes) with ≥200 HP.", "status": "done" },
-    { "id": 46, "title": "Wave 14 600 HP spike at 6 heavy all-lanes — run 64 (SECOND to reach W15, favorable heal+zero W7-W13) entered W14 with 630 HP but W14 (6 heavy all-lanes) dealt 600 HP (~6/6 reached base ≈100 HP/heavy, towers killed ~0-1) — near-total penetration. W15 (17 boss) killed remaining 30 HP. W14 reduced 6→4 heavy all-lanes. Note: tower kill-rate on heavies is ~0-20% regardless of count; if W14=4 still spikes, next lever should be tower damage or heavy HP, not count. Goal: enter W15 with ≥200 HP.", "status": "done" },
-    { "id": 47, "title": "Wave 9 regression / W6 single-lane spike — run 65 (no-heal) died at W9 from an early medium cascade. W6 (4 medium Nord, single-lane) dealt an anomalous 180 HP (vs 0 HP in run 62 same config); combined W5+W6 = 240 HP left only 260 HP, then W9 (6 medium all) dealt 260 HP and killed. W6 reduced 4→3 medium Nord to smooth the no-heal early cascade (single-lane concentration is a documented high-variance source, backlog #13/#15). Goal: no-heal passive baseline reaches W10+ so the late-game heavy tuning (W10-W15) can be re-validated. If W9 (6 medium all) is still the killer next run, reduce it 6→5.", "status": "done" },
-    { "id": 48, "title": "Tower DPS vs heavy HP — SWITCHED LEVER from wave-count to tower damage. Run 66 (heal run) died at W13: W12 (3 heavy all) dealt 240 HP and W13 (3 heavy all) 240 HP, all 6 heavies penetrated at ~80 HP each, towers killed 0. W12/W13 are at the count-nerf floor (3 heavy = 1/lane); 25 runs of count-nerfing (41-65) stalled because stinger damage 25 cannot kill a 250 HP heavy in its ~8-shot transit (25×8=200<250). Stinger damage 25→35 (35×8=280>250 crosses kill threshold). Goal: stingers kill Nord+Sør heavies in W11-W14, leaving only the Midt heavy (no stinger on Midt, only a webber) leaking ~80 HP/wave → passive baseline reaches W14+. Next lever if Midt leaks: 6th free stinger on Midt lane.", "status": "done" },
-    { "id": 49, "title": "Wave 15 boss wave is the SOLE remaining bottleneck — run 67 (LANDMARK: first no-heal run to reach W15) proved backlog #48 (stinger 25->35) solved the entire W10-W14 heavy bottleneck: W6-W13 all zero damage incl. W12/W13 (3 heavy all) that killed run 66, W14 (4 heavy) only 120 HP (was 600). W15 (17 boss @ 1000 HP) killed from 350 HP, 14/17 bosses alive (towers killed ~3). Bosses at 1000 HP (4x heavy) are untankable by 35-dmg stingers (280<1000). W15 boss count reduced 17->14 (1/lane). Goal: measure whether a heal-draw passive run can survive/nearly-survive W15, and whether it is closable by light active play (gold went unspent). If 14 bosses still wipe a full-HP entry, the next lever is boss HP (GameScene line 980: boss hpMul 4->3 = 750 HP) rather than count, mirroring the #46->#48 count-to-damage lever switch.", "status": "pending" }
+    {
+      "id": 1,
+      "title": "Auto-place starter tower — place 1 free Stinger tower near base at game start to help new players understand tower placement",
+      "status": "done"
+    },
+    {
+      "id": 2,
+      "title": "Wave preview arrows — show lane indicators before wave starts so player knows which lanes will be hit",
+      "status": "done"
+    },
+    {
+      "id": 3,
+      "title": "Tower sell button — right-click a placed tower to refund 50% of cost",
+      "status": "done"
+    },
+    {
+      "id": 4,
+      "title": "Boss visual indicator — special spawn animation + warning banner for boss waves (wave 15)",
+      "status": "done"
+    },
+    {
+      "id": 5,
+      "title": "End screen stats — show waves cleared, towers built, total kills, gold spent on win/loss screen",
+      "status": "done"
+    },
+    {
+      "id": 6,
+      "title": "Active upgrades summary on end screen — list which upgrades were taken so player can review their build after death",
+      "status": "done"
+    },
+    {
+      "id": 7,
+      "title": "Second tower slot — give player a second free tower placement to cover more lanes in passive runs, reducing wave-4-5 cliff",
+      "status": "done"
+    },
+    {
+      "id": 8,
+      "title": "Wave 4 survival — passive play still dies at wave 4 despite 2 towers. Either reduce wave 4 soldiers (7→5) or increase base HP (500→600), or add a Webber slowtower as 3rd free tower to help stingers kill faster",
+      "status": "done"
+    },
+    {
+      "id": 9,
+      "title": "Wave 5-7 medium cliff — smoother ramp needed: 5→6→5 soldiers (was 6→7→8) for medium waves. Passive play dies wave 6-7 due to steep jump when all-lanes wave hits simultaneously.",
+      "status": "done"
+    },
+    {
+      "id": 10,
+      "title": "Active play enablement — passive runs end with 1000+ gold unspent. Consider a gold-nudge UI or tutorial prompt when player has >300 gold and wave is about to start, encouraging tower building.",
+      "status": "done"
+    },
+    {
+      "id": 11,
+      "title": "Wave 8 Sør coverage — wave 8 is 9 heavy units all on Sør lane, but only a Webber covers Sør (no Stinger). Either add a 4th starter Stinger near Sør or reduce wave 8 soldiers (9→7). Currently the hard wall for passive runs.",
+      "status": "done"
+    },
+    {
+      "id": 12,
+      "title": "Wave 5 damage variance — passive runs take 0–90 HP in wave 1 (4 light Midt) and die at wave 5 without HP-heal upgrade. High upgrade-RNG dependency. Consider increasing stinger range 200→220 to ensure Midt units are consistently caught, or reduce wave 5 from 5→4 medium. Goal: wave 5 survivable without HP-heal draw.",
+      "status": "done"
+    },
+    {
+      "id": 13,
+      "title": "Wave 6-7 survival — with stinger range 220 and wave 5 at 4 medium, passive runs should survive to wave 6+. Next bottleneck: wave 6 (6 medium Nord) + wave 7 (6 medium all-lanes). Monitor if passive baseline moves from wave 4 to wave 6-7 range. If still dying at wave 5, consider reducing wave 6 or adding a Spitter tower as 5th free starter.",
+      "status": "done"
+    },
+    {
+      "id": 14,
+      "title": "Wave 8 Sør heavy cliff — 6 heavy Sør overwhelms 1 Stinger + 1 Webber. Added 5th free Spitter at (350,800) for splash AoE + reduced wave 8 6→5 heavy.",
+      "status": "done"
+    },
+    {
+      "id": 15,
+      "title": "Wave 6-7 mid-game cliff — W6 (5 medium Nord) and W7 (6 medium all) caused -360 HP total in run 34 with bad upgrades. Reduced W6 5→4 and W7 6→5 to smooth ramp. Goal: passive baseline survives wave 7 with ≥250 HP regardless of upgrade draw.",
+      "status": "done"
+    },
+    {
+      "id": 16,
+      "title": "Wave 8-9 survival — with W6/W7 reductions, passive baseline should enter wave 8 with ≥250 HP. Monitor if 5 free towers (2 Stinger Nord, Webber Midt/Sør, Stinger Sør, Spitter Sør) handle wave 8 (5 heavy Sør) and wave 9 (10 medium all-lanes = ~3-4 per lane). If still dying at wave 8, consider reducing W8 to 4 heavy or repositioning Spitter. If wave 9 is new bottleneck, reduce 10→8 medium or add 6th free tower.",
+      "status": "done"
+    },
+    {
+      "id": 17,
+      "title": "Wave 9 survival — W8 reduced to 4 heavy Sør. Monitor if passive baseline reaches wave 9 (10 medium all-lanes). If 10 medium all-lanes (~3-4 per lane) kills base, reduce to 8 or add 6th free tower (Stinger/Spitter) on Midt. Also investigate anomalous early-wave damage seen in run 35 (3x speed): run future tests at 1x speed to confirm W2-3 are still handled by 5 towers with 0 damage.",
+      "status": "done"
+    },
+    {
+      "id": 18,
+      "title": "Wave 8 Sør cliff (again) — run 36 with 4 heavy Sør killed base from 320 HP with bad upgrade draw (Krigsdronning+Termitt-koloni). W8 reduced 4→3 heavy Sør. Follows established 1-unit-reduction pattern. Goal: passive baseline enters wave 9 with ≥200 HP regardless of upgrade RNG.",
+      "status": "done"
+    },
+    {
+      "id": 19,
+      "title": "Wave 8-9 cliff — run 37 first to reach W9 but only 20 HP entering it. W8 (3 heavy) dealt 240 HP; W9 (10 medium all-lanes) immediately killed. W8 reduced 3→2 heavy Sør + W9 reduced 10→8 medium all-lanes. Goal: passive baseline enters W9 with ≥100 HP and W9 survivable with 5 free towers even with bad upgrade RNG.",
+      "status": "done"
+    },
+    {
+      "id": 20,
+      "title": "Wave 10 bottleneck — run 38 reached W10 with 630 HP but 11 heavy Midt killed base in one wave. W8 (2 heavy Sør) and W9 (8 medium all) both dealt zero damage confirming backlog #19 effective. W10 reduced 11→9 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 21,
+      "title": "Wave 10 still lethal at 9 heavy Midt — run 39 entered W10 with only 200 HP and died (all-unit-combat upgrade draw, no HP-heal). W10 reduced 9→7 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥100 HP even without HP-heal upgrades.",
+      "status": "done"
+    },
+    {
+      "id": 22,
+      "title": "Wave 10 still lethal at 7 heavy Midt — run 40 entered W10 with 500 HP (full health!) and still died. 5 free towers cannot handle 7 concentrated heavies on Midt lane. W10 reduced 7→5 heavy Midt. Goal: passive baseline reaches W11 (12 heavy all-lanes) with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 23,
+      "title": "Wave 11 bottleneck — run 41 reached W11 with 380 HP (new milestone!) but 12 heavy all-lanes killed base completely. 4 heavy per lane overwhelms 5 free towers. W11 reduced 12→9 heavy all-lanes (1 unit per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 24,
+      "title": "Wave 10 still lethal at 5 heavy Midt — run 42 entered W10 with 630 HP (lucky heal) but took 480 HP damage (vs 120 HP in run 41 — extreme variance). Without heal upgrade, passive runs die at W10 consistently. W10 reduced 5→3 heavy Midt (2-unit reduction). Goal: passive baseline enters W11 (9 heavy all-lanes) with ≥200 HP regardless of upgrade draw.",
+      "status": "done"
+    },
+    {
+      "id": 25,
+      "title": "Wave 11 bottleneck at 9 heavy all-lanes — run 43 entered W11 with exactly 200 HP (backlog #24 goal achieved) but 9 heavy all-lanes (3 per lane) killed base completely. Also killed 380 HP in run 41. W11 reduced 9→6 heavy all-lanes (1 per lane reduction). Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 26,
+      "title": "Wave 11 still lethal at 6 heavy all-lanes — run 44 entered W11 with 210 HP (goal met) but 6 heavy all-lanes (2 per lane) killed base completely (210 HP in one wave). W9 also showed high variance (0-180 HP: 0 in run 43, 180 in run 44). W11 reduced 6→3 heavy all-lanes (1 per lane). W9 reduced 8→6 medium all-lanes. Goal: passive baseline reaches W12 (14 heavy all-lanes) with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 27,
+      "title": "Wave 12 bottleneck at 14 heavy all-lanes — run 45 entered W12 with 690 HP (huge surplus from backlog #26) but 14 heavy all-lanes (~5 per lane) dealt 480 HP (690→210). Entered W13 with 210 HP but killed immediately (16 heavy all-lanes). W12 reduced 14→11 heavy all-lanes (1 per lane reduction). Severe jump from W11 (3 heavy) to W12 (14 heavy) needs smoothing. Goal: passive baseline reaches W13 (16 heavy all-lanes) with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 28,
+      "title": "Wave 7 cascade issue — run 46 (no heal upgrade) died at W9: W7 (5 medium all) dealt 180 HP → cascaded into W8 (-120 HP) → entered W9 with only 200 HP (killed). W7 reduced 5→4 medium all-lanes. Backlog #27 (W12: 11 heavy) unvalidated due to early death. Goal: passive baseline survives W7-W9 without heal upgrade, enters W10 with ≥200 HP so W12 validation can happen.",
+      "status": "done"
+    },
+    {
+      "id": 29,
+      "title": "Wave 12 bottleneck at 11 heavy all-lanes — run 47 confirmed backlog #28 (W7 zero damage) but W12 (11 heavy all-lanes) killed from 260 HP worst-case entry (no heal: 500 - 120 W8 - 120 W10 = 260 HP). W12 reduced 11→8 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.",
+      "status": "done"
+    },
+    {
+      "id": 30,
+      "title": "Wave 12 still lethal at 8 heavy all-lanes — run 48 confirmed worst-case entry at 260 HP (500 - 60 W4 - 120 W6 - 60 W9). W12 (8 heavy all-lanes ≈ 2-3 per lane) killed from 260 HP with all-bad upgrade draw. W12 reduced 8→5 heavy all-lanes (1 per lane reduction). Goal: passive baseline enters W13 (16 heavy all-lanes) with ≥100 HP.",
+      "status": "done"
+    },
+    {
+      "id": 31,
+      "title": "Wave 8 Sør high variance — run 49 showed W8 (2 heavy Sør) dealing 120 HP (vs 0 HP in runs 47-48). Combined with W6 (-120 HP), the cascade W6+W8=-240 HP leaves only 200 HP entering W10, which is lethal (3 heavy Midt). W8 reduced 2→1 heavy Sør. Goal: passive baseline enters W9 consistently with ≥300 HP so W12 (5 heavy all-lanes) can be validated without W8 cascades.",
+      "status": "done"
+    },
+    {
+      "id": 32,
+      "title": "Wave 13 new bottleneck — run 50 (NEW RECORD: first to reach W13) died from 150 HP. W12 (5 heavy all-lanes) dealt 360 HP in run 50. W13 (16 heavy all-lanes) killed from 150 HP immediately. W13 reduced 16→13 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP.",
+      "status": "done"
+    },
+    {
+      "id": 33,
+      "title": "Wave 13 still lethal at 13 heavy all-lanes — run 51 entered W13 with 510 HP (far better entry than run 50's 150 HP) but 13 heavy all-lanes killed base completely. W13 reduced 13→10 heavy all-lanes (1 per lane reduction). High W12 variance noted: 120 HP in run 51 vs 360 HP in run 50 for same 5 heavy config. Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP.",
+      "status": "done"
+    },
+    {
+      "id": 34,
+      "title": "Wave 10 extreme variance — run 52 (no heal upgrade) entered W10 with 320 HP but W10 (3 heavy Midt) dealt 240 HP, leaving only 80 HP for W11. W10 variance range: 60-240 HP for same 3 heavy config. W10 reduced 3→2 heavy Midt. Goal: passive baseline WITHOUT heal upgrade survives W10-W11 and enters W12 (5 heavy all-lanes) with ≥200 HP so W13 (10 heavy, backlog #33 change) can be validated.",
+      "status": "done"
+    },
+    {
+      "id": 35,
+      "title": "Wave 11 bottleneck at 3 heavy all-lanes — run 53 (no heal) entered W11 with 290 HP but 3 heavy all-lanes (1/lane round-robin) dealt 240 HP (80 HP/heavy avg = ~2 base attacks each before towers finish). W11 reduced 3→2 heavy all-lanes. Goal: passive baseline WITHOUT heal enters W12 (5 heavy all-lanes) with ≥150 HP.",
+      "status": "done"
+    },
+    {
+      "id": 36,
+      "title": "Wave 13 bottleneck at 10 heavy all-lanes — run 54 (no heal, BEST run yet) entered W13 with 380 HP (500 - 120 W12) but 10 heavy all-lanes killed from 380 HP (~38 HP/heavy). W13 reduced 10→7 heavy all-lanes (1 per lane reduction). Goal: passive baseline WITHOUT heal enters W14 (18 heavy all-lanes) with ≥100 HP.",
+      "status": "done"
+    },
+    {
+      "id": 37,
+      "title": "Wave 12 extreme variance — run 55 (no heal) entered W12 with 410 HP but W12 (5 heavy all-lanes) dealt 240 HP (vs 120 HP in run 54 — 2× variance). Only 170 HP entered W13 (7 heavy all-lanes, backlog #36 reduction). W13 killed from 170 HP (3 heavies reached base, ~57 HP/heavy). Root cause: W12 worst-case 240 HP makes backlog #36's W13=7 heavy calibration break down. W12 reduced 5→4 heavy all-lanes. Goal: W12 worst-case drops to ~180 HP, ensuring passive baseline (without heal, with up to 90 HP early damage) enters W13 with ≥230 HP so W13 (7 heavy) can be properly evaluated.",
+      "status": "done"
+    },
+    {
+      "id": 38,
+      "title": "Wave 13 still lethal at 7 heavy all-lanes — run 56 (heal draw) entered W13 with 360 HP but all 7 heavies cleared base (~51 HP/heavy × 7 = 357 HP). W12 (4 heavy) validated at 120 HP damage this run. W13 reduced 7→4 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (18 heavy all-lanes) with ≥100 HP.",
+      "status": "done"
+    },
+    {
+      "id": 39,
+      "title": "Wave 14 bottleneck at 18 heavy all-lanes — run 57 (heal draw) entered W14 with 390 HP (backlog #38 goal met) but 18 heavy all-lanes killed base from 390 HP (6 reached base ≈65 HP/heavy, 12 still alive). W13 (4 heavy) confirmed zero damage. W12 high variance: 120 HP (run 56) vs 240 HP (run 57) for same 4-heavy config. W14 reduced 18→15 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W15 (20 heavy all-lanes boss) with ≥100 HP.",
+      "status": "done"
+    },
+    {
+      "id": 40,
+      "title": "Wave 13 extreme variance at 4 heavy all-lanes — run 58 (heal after W10) entered W13 with 390 HP (same as run 57) but W13 dealt 240 HP (vs 0 HP in run 57 — same config, same entry HP). Combined W12+W13 damage: 600 HP from 750 HP base, leaving only 150 HP for W14. W14 (15 heavy) killed from 150 HP (13 soldiers still alive, ~75 HP/heavy). W13 reduced 4→3 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W14 (15 heavy all-lanes) with ≥300 HP so W14 leaves ≥100 HP entering W15.",
+      "status": "done"
+    },
+    {
+      "id": 41,
+      "title": "Wave 14 still lethal at 15 heavy all-lanes — run 59 (heal draw) entered W14 with 510 HP (backlog #40 goal met) but 15 heavy killed base completely (6 reached base ≈85 HP/heavy, 9 still alive). W12+W13 both zero damage this run (very favorable). W14 reduced 15→12 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W15 (20 heavy boss) with ≥100 HP.",
+      "status": "done"
+    },
+    {
+      "id": 42,
+      "title": "Wave 14 still lethal at 12 heavy all-lanes — run 60 (no-heal worst case) entered W14 with 320 HP, died (8/12 alive, ~4 cleared base ≈80 HP/heavy). Consistent with run 59 (~85 HP/heavy). W14 reduced 12→9 heavy all-lanes (1 per lane reduction). Expected with-heal entry ~570–630 HP; with 9 heavy ~3 reach base (~240 HP damage) → enter W15 with ≥200 HP. Goal: passive baseline (with Forsterket tue heal) enters W15 (20 heavy boss) with ≥200 HP so W15 boss mechanics can be tested.",
+      "status": "done"
+    },
+    {
+      "id": 43,
+      "title": "Wave 15 first tested — run 61 (FIRST TO REACH W15, best-case: heal after W10 + zero W12/W13) entered W15 with 270 HP but 20 boss heavies (4× HP=1000, 2× dmg=80) killed from 270 HP with 12/20 still alive. Towers killed 8 bosses, ~3 cleared base (~90 HP/boss). W15 reduced 20→17 boss heavy all-lanes (1 per lane reduction). Goal: calibrate W15 boss count so passive run damage profile is measurable; active play should eventually be able to win W15.",
+      "status": "done"
+    },
+    {
+      "id": 44,
+      "title": "Wave 12 extreme variance at 4 heavy all-lanes — run 62 (no-heal) entered W12 with 380 HP but W12 dealt 240 HP (worst-case), leaving only 140 HP for W13 (3 heavy all-lanes). W13 killed from 140 HP (all 3 cleared base ~47 HP/heavy). W12 worst-case 240 HP confirmed 3 runs (57/58/62). W12 reduced 4→3 heavy all-lanes. Goal: passive baseline (no-heal, worst case) enters W14 (9 heavy all-lanes) with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 45,
+      "title": "Wave 14 bottleneck at 9 heavy all-lanes — run 63 (heal draw) entered W14 with 690 HP but W14 killed from 690 HP (7/9 reached base ≈98 HP/heavy, only 2 killed by towers — 22% kill rate). W12+W13 both zero (backlog #44 fully confirmed). W14 reduced 9→6 heavy all-lanes (1 per lane reduction). Goal: passive baseline (with Forsterket tue heal) enters W15 (17 boss heavy all-lanes) with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 46,
+      "title": "Wave 14 600 HP spike at 6 heavy all-lanes — run 64 (SECOND to reach W15, favorable heal+zero W7-W13) entered W14 with 630 HP but W14 (6 heavy all-lanes) dealt 600 HP (~6/6 reached base ≈100 HP/heavy, towers killed ~0-1) — near-total penetration. W15 (17 boss) killed remaining 30 HP. W14 reduced 6→4 heavy all-lanes. Note: tower kill-rate on heavies is ~0-20% regardless of count; if W14=4 still spikes, next lever should be tower damage or heavy HP, not count. Goal: enter W15 with ≥200 HP.",
+      "status": "done"
+    },
+    {
+      "id": 47,
+      "title": "Wave 9 regression / W6 single-lane spike — run 65 (no-heal) died at W9 from an early medium cascade. W6 (4 medium Nord, single-lane) dealt an anomalous 180 HP (vs 0 HP in run 62 same config); combined W5+W6 = 240 HP left only 260 HP, then W9 (6 medium all) dealt 260 HP and killed. W6 reduced 4→3 medium Nord to smooth the no-heal early cascade (single-lane concentration is a documented high-variance source, backlog #13/#15). Goal: no-heal passive baseline reaches W10+ so the late-game heavy tuning (W10-W15) can be re-validated. If W9 (6 medium all) is still the killer next run, reduce it 6→5.",
+      "status": "done"
+    },
+    {
+      "id": 48,
+      "title": "Tower DPS vs heavy HP — SWITCHED LEVER from wave-count to tower damage. Run 66 (heal run) died at W13: W12 (3 heavy all) dealt 240 HP and W13 (3 heavy all) 240 HP, all 6 heavies penetrated at ~80 HP each, towers killed 0. W12/W13 are at the count-nerf floor (3 heavy = 1/lane); 25 runs of count-nerfing (41-65) stalled because stinger damage 25 cannot kill a 250 HP heavy in its ~8-shot transit (25×8=200<250). Stinger damage 25→35 (35×8=280>250 crosses kill threshold). Goal: stingers kill Nord+Sør heavies in W11-W14, leaving only the Midt heavy (no stinger on Midt, only a webber) leaking ~80 HP/wave → passive baseline reaches W14+. Next lever if Midt leaks: 6th free stinger on Midt lane.",
+      "status": "done"
+    },
+    {
+      "id": 49,
+      "title": "Wave 15 boss wave is the SOLE remaining bottleneck — run 67 (LANDMARK: first no-heal run to reach W15) proved backlog #48 (stinger 25->35) solved the entire W10-W14 heavy bottleneck: W6-W13 all zero damage incl. W12/W13 (3 heavy all) that killed run 66, W14 (4 heavy) only 120 HP (was 600). W15 (17 boss @ 1000 HP) killed from 350 HP, 14/17 bosses alive (towers killed ~3). Bosses at 1000 HP (4x heavy) are untankable by 35-dmg stingers (280<1000). W15 boss count reduced 17->14 (1/lane). Goal: measure whether a heal-draw passive run can survive/nearly-survive W15, and whether it is closable by light active play (gold went unspent). If 14 bosses still wipe a full-HP entry, the next lever is boss HP (GameScene line 980: boss hpMul 4->3 = 750 HP) rather than count, mirroring the #46->#48 count-to-damage lever switch.",
+      "status": "done"
+    },
+    {
+      "id": 50,
+      "status": "pending",
+      "title": "6th free stinger added on Midt lane (450,470) — run 68 (heal run, but heavy early-medium variance) died W11 at HP 0. Decisive damage was Midt-lane leakage: W5 (4 medium Midt) -180, W10 (2 heavy Midt) -120 — both penetrated because Midt previously had ONLY a webber (dmg 5), no stinger. The two 'Nord+Midt' stingers (400,440)/(320,490) lean Nord and under-serviced Midt. Added a Midt-dedicated stinger covering the near-base Midt stretch (x~260-640). HP map run 68: W1 500, W2 440(-60), W3 380(-60), W4 750(HEAL), W5 570(-180 Midt!), W6 450(-120 Nord single-lane), W7 270(-180), W8 270(0), W9 210(-60), W10 90(-120 Midt!), W11 0. Goal: Midt stinger eliminates the W5/W7/W9/W10 Midt leakage so a heal run again reaches W14-15 like run 67, and a no-heal run clears the mid-game. If early all-lane medium waves (W7/W9) still spike, next lever is reducing those medium counts or stinger fireRate. If W15 boss wave is reached again, revisit boss HP (4x->3x heavy) per backlog #49."
+    }
   ]
 }

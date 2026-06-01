@@ -190,6 +190,7 @@ export const CONFIG = {
   FREE_STARTER_TOWERS: [
     { type: 'stinger' as const, x: 400, y: 440 },  // nord + midt ved x=400
     { type: 'stinger' as const, x: 320, y: 490 },  // nord + midt ved x=320 — andre ildpunkt nærmere basen
+    { type: 'stinger' as const, x: 450, y: 470 },  // midt-dedikert — dekker midt-innløpet (x≈260-640) der tunge enheter lekket (run 68: W10 2 tunge Midt -120, W5 -180); midt hadde før kun webber
     { type: 'webber'  as const, x: 420, y: 620 },  // midt + sør — slow-sone for bølge 5-7
     { type: 'stinger' as const, x: 300, y: 770 },  // sør — dekker sør-lane-inngang (bølge 8+)
     { type: 'spitter' as const, x: 350, y: 800 },  // sør — splash AoE mot tunge enheter i klynge (bølge 8)
