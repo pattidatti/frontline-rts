@@ -978,7 +978,7 @@ export class GameScene extends Phaser.Scene {
     const container = this.add.container(startPos.x, startPos.y, [footprint, shadow, antBody, hpBg, hpFg]).setDepth(5);
 
     const hpMul = (boss ? 3 : 1) * modHp;
-    const dmgMul = (boss ? 2 : 1) * modDmg;
+    const dmgMul = (boss ? 1.5 : 1) * modDmg;
     const finalHp = Math.max(1, Math.round(spec.hp * hpMul));
 
     const unit: UnitData = {
