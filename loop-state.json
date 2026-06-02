@@ -1,10 +1,10 @@
 {
-  "run": 74,
+  "run": 75,
   "max_runs": 200,
   "phase": "running",
   "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 414,
-  "notes": "TD-balansering. Run 73 (HEAL run, Forsterket tue W5 500->750, boss dmg 1.5x fra #54 aktiv): W1-W14 ALLE NULL skade (identisk ren baseline som run 72), gikk inn i W15 ved FULLE 750 HP. W15 (14 boss @ 750 HP, NÅ 60 dmg/treff) wipet likevel fra 750 HP MEN ai=2 (tårnene drepte 12/14 — opp fra 9/14 i run 72). REN TEST av boss-dmg-60 (#54): endringen HJALP delvis (lekkere 5->2, leak halvert) men lukket ikke — de 2 gjenværende 750 HP-lekkerne lander hver ~6 treff @ 60 = ~720 og dreneger bufferet. Rot-årsak uendret: lekkerne er for TANKY (750 HP) til å drepes ved basen før de tømmer HP. SPAK denne run (#55): boss HP 3x->2.5x (750->625, GameScene.ts:980) per #54's dokumenterte neste spak — dobbel gevinst (flere transit-kills + raskere base-kills). Matematikk: 2 lekkere @ 625 HP dør ~17% raskere -> ~5 treff x 60 = 600 < 750 -> full-HP-entry skal OVERLEVE. Gull 4006 ubrukt. Neste run: hvis 625 HP-entry nå overlever passivt er pre-boss-spillet (W1-W14 null skade) for lett -> pivot til active-play win-rate eller re-eskalér midt-waves (passiv-driver kan ikke måle 40-60% win-rate-målet); hvis fortsatt wipe, spak W15 count 14->11.",
+  "avg_duration_last_10": 409,
+  "notes": "TD-balansering. Run 74 (REN NO-HEAL test av boss-HP-625 #55): INGEN Forsterket tue trukket — W1-W14 ALLE NULL skade ved fulle 500 HP (reneste baseline noensinne, bedre enn run 73 som trengte W5-heal). Gikk inn i W15 ved FULLE 500 HP uten heal. W15 (14 boss @ 625 HP, 60 dmg) wipet likevel fra 500 HP, ai=6 (tårnene drepte 8/14). VIKTIG: ai=6 vs run 73's ai=2 er IKKE regresjon — run 73 entret ved 750 HP (heal) som ga tårnene ~50% lengre fyringstid (run 71 dokumenterte dette artefaktet); denne run's 500 HP-buffer brant ut raskere (500/60≈8 treff, 6 lekkere). boss-HP-625 (#55) målt: 750->625 hjalp transit-kills men full 500 HP no-heal-entry wiper fortsatt fordi ~6 boss lekker og dreneger bufferet. Rot-årsak nå bekreftet STRUKTURELL: 14 boss over 3 laner = ~5/lane, de 6 tårnene dreper kun ~8 i transit UANSETT boss-HP, etterlater ~6 lekkere — for mange for enhver rimelig HP-buffer. Stat-spaker (HP 1000->750->625, dmg 80->60 over run 70-74) uttømt med avtagende gevinst. SPAK denne run (#56): W15 boss count 14->11 (config.ts:246), run 73's dokumenterte fallback. Tårnene dreper fast ~8; 11-8=3 lekkere (HALVERT fra 6). Gull 3410. Neste run: hvis 11-boss full-HP-entry endelig overlever passivt -> hele passiv-spillet løst (W1-W15) -> pre-boss for lett til å måle 40-60% win-rate -> PIVOT til active-play win-rate eller re-eskalér midt-waves; hvis fortsatt wipe, spak boss dmg 60->45 eller 7. gratis tårn.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
   "last_error": null,
@@ -15,6 +15,19 @@
     "all_15_waves_reachable": true
   },
   "history": [
+    {
+      "run": 74,
+      "mode": "passive + auto-upgrade (first card each wave, 3x speed badge, Playwright in-page driver v38 — base /frontline-rts/ on PORT 5174 (5173 occupied by eiriksbok), Enter-key start, setInterval auto-clicks .rts-upgrade-card + wave-start button + G key, records entry+min HP per wave from #game-metrics)",
+      "state": "lost",
+      "game_time": 415,
+      "wave_reached": 15,
+      "player_base_hp": 0,
+      "ai_soldiers_remaining": 6,
+      "gold_at_end": 3410,
+      "towers": 6,
+      "notes": "CLEANEST BASELINE EVER — NO-HEAL test of boss-HP-625 (#55). NO Forsterket tue heal drawn the entire run. HP map: W1-W14 ALL ZERO damage at full 500 HP (every pre-boss wave entered AND exited at 500 — better than run 73 which needed a W5 heal to hold 750). Entered W15 at FULL 500 HP no-heal. W15 (14 boss @ 625 HP after #55, 60 dmg/hit) STILL wiped the base from 500 HP, ai=6 remaining (towers killed 8/14 bosses). KEY DIAGNOSTIC: ai=6 vs run 73's ai=2 is NOT a regression — run 73 entered W15 at 750 HP (heal) giving towers ~50% longer to fire before the base burned out (run 71 documented this exact artifact: leftover-ai count is a function of survival TIME, not tower DPS). This run's 500 HP buffer burned out faster (500/60≈8 hits, 6 leakers landing them). So boss-HP-625 (#55) is now measured: lowering 750->625 helped transit kills, but a full 500 HP no-heal entry still wipes because ~6 bosses leak past the 6 towers and drain the buffer. ROOT CAUSE now confirmed STRUCTURAL, not a stat-tuning problem: 14 bosses across 3 lanes = ~5/lane, and the 6 fixed towers can only kill ~8 in transit REGARDLESS of boss HP — leaving ~6 leakers, too many for any reasonable HP buffer (run 73's 750 heal also wiped). The stat levers (boss HP 1000->750->625 over #52/#55, dmg 80->60 #54) are exhausted with diminishing returns. Gold 3410 unspent. Port note: turtle dev server on 5174 (5173 = eiriksbok).",
+      "action": "balance (backlog #56): W15 boss count 14->11 (config.ts:246), the documented fallback from run 73's notes. Reasoning: 3 consecutive stat-nerf runs (boss HP 1000->750->625 #52/#55, dmg 80->60 #54) still wipe a full-HP W15 entry — run 74 at 500 HP no-heal -> ai=6 wipe, run 73 at 750 HP heal -> ai=2 wipe. The towers kill a roughly FIXED ~8 bosses in transit regardless of boss HP (their DPS-vs-transit-window is the cap); with 14 bosses that leaves ~6 leakers, and 6 leakers at 60 dmg drain any buffer (6 x ~1.4 base-hits x 60 > 500). Reducing count 14->11 directly cuts leakers from ~6 to ~3 (towers still kill ~8, 11-8=3) — HALVING the base drain. Math: 3 leakers x ~3 base-hits x 60 ≈ 540, marginally over 500 but a full-HP entry should now survive or near-survive (and a heal run at 750 would clear). This is the right lever now precisely because the bottleneck is structural (too many leakers), not stat tankiness. Boss HP (625) and dmg (60) unchanged. Verified: typecheck clean, reload shows hp=500 / towers=6 / 15 waves, 0 console errors. Goal: a full-HP no-heal entry into W15 finally survives passively (ai near 0). If it survives, the ENTIRE passive game is solved (W1-W15 all passively clearable) -> the pre-boss game is too easy to measure the 40-60% win-rate victory condition -> PIVOT next run to active-play win-rate tuning or re-escalate mid-waves. If it still wipes, next lever is boss dmg 60->45 or a 7th free starter tower."
+    },
     {
       "run": 73,
       "mode": "passive + auto-upgrade (first card each wave, 3x speed, Playwright in-page driver v37 — base /frontline-rts/ on PORT 5174 (5173 occupied by eiriksbok dev server), Enter-key start, setInterval auto-clicks .rts-upgrade-card + wave-start button + G key, records entry+min HP per wave from #game-metrics)",
