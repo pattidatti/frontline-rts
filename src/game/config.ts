@@ -194,6 +194,7 @@ export const CONFIG = {
     { type: 'webber'  as const, x: 420, y: 620 },  // midt + sør — slow-sone for bølge 5-7
     { type: 'stinger' as const, x: 300, y: 770 },  // sør — dekker sør-lane-inngang (bølge 8+)
     { type: 'spitter' as const, x: 350, y: 800 },  // sør — splash AoE mot tunge enheter i klynge (bølge 8)
+    { type: 'spitter' as const, x: 430, y: 540 },  // konvergens-backstop — splash AoE mot klyngede medium-bølger fra ALLE 3 laner rett før arena (run 76: W5/W6/W9 medium lekket 360 HP no-heal og sultet W15-entry til 140). Splash 15 mot single-file 625-HP bosser er neglisjerbar → stabiliserer W15-entry uten å kontaminere count=13-kniveggen.
   ] as const,
   TOWER_TYPES: {
     stinger: { cost: 80,  hp: 200, damage: 35, range: 220, fireRate: 800, splash: 0,  slow: 0,    color: 0xb89048 },
