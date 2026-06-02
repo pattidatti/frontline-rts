@@ -1,10 +1,11 @@
 {
-  "run": 75,
+  "run": 76,
   "max_runs": 200,
   "phase": "running",
-  "win_rate_last_5": 0.0,
-  "avg_duration_last_10": 409,
-  "notes": "TD-balansering. Run 74 (REN NO-HEAL test av boss-HP-625 #55): INGEN Forsterket tue trukket — W1-W14 ALLE NULL skade ved fulle 500 HP (reneste baseline noensinne, bedre enn run 73 som trengte W5-heal). Gikk inn i W15 ved FULLE 500 HP uten heal. W15 (14 boss @ 625 HP, 60 dmg) wipet likevel fra 500 HP, ai=6 (tårnene drepte 8/14). VIKTIG: ai=6 vs run 73's ai=2 er IKKE regresjon — run 73 entret ved 750 HP (heal) som ga tårnene ~50% lengre fyringstid (run 71 dokumenterte dette artefaktet); denne run's 500 HP-buffer brant ut raskere (500/60≈8 treff, 6 lekkere). boss-HP-625 (#55) målt: 750->625 hjalp transit-kills men full 500 HP no-heal-entry wiper fortsatt fordi ~6 boss lekker og dreneger bufferet. Rot-årsak nå bekreftet STRUKTURELL: 14 boss over 3 laner = ~5/lane, de 6 tårnene dreper kun ~8 i transit UANSETT boss-HP, etterlater ~6 lekkere — for mange for enhver rimelig HP-buffer. Stat-spaker (HP 1000->750->625, dmg 80->60 over run 70-74) uttømt med avtagende gevinst. SPAK denne run (#56): W15 boss count 14->11 (config.ts:246), run 73's dokumenterte fallback. Tårnene dreper fast ~8; 11-8=3 lekkere (HALVERT fra 6). Gull 3410. Neste run: hvis 11-boss full-HP-entry endelig overlever passivt -> hele passiv-spillet løst (W1-W15) -> pre-boss for lett til å måle 40-60% win-rate -> PIVOT til active-play win-rate eller re-eskalér midt-waves; hvis fortsatt wipe, spak boss dmg 60->45 eller 7. gratis tårn.",
+  "win_rate_last_5": 0.2,
+  "avg_duration_last_10": 412,
+  "notes": "TD-balansering. Run 75 (REN test av W15-count-11 #56): FØRSTE SEIER NOENSINNE. HEAL-run (Forsterket tue ~W9/W10, 500->750). HP-map: W1-W9 ALLE NULL ved 500, heal->750 ved W10, W10-W15 ALLE NULL ved 750 — HVER ENESTE bølge null skade (entry=min for alle 15). W15 (11 boss @ 625 HP, 60 dmg) tok NULL skade fra 750-entry, ai=0 (tårnene drepte ALLE 11 i transit). #56 (14->11) var KOMPLETT SUKSESS — første passive klarering av alle 15 bølger. MEN over-korrigert: W15 null-lekkasje betyr at de 6 tårnene har transit-kill-kapasitet til overs (>=11), klimakset har ingen tenner, passiv win-rate ~100% langt over 40-60%-målet. HELE spillet er nå trivielt passivt (W1-W14 også null skade). Per run 74's dokumenterte pivot: passiv-spillet er LØST -> re-eskalér for å gjenopprette utfordring. SPAK denne run (#57): W15 boss count 11->13 (config.ts:246). 14 wiper pålitelig (run 74 ai=6 fra 500, run 73 ai=2 fra 750), 11 vinner rent med null skade -> kniveggen er 11<x<14; 13 er ett steg under wipe-terskelen, gjeninnfører ~2-4 lekkere mot 625-HP/60-dmg-boss -> heal-draw/RNG-avhengig coin-flip mot 40-60%-vilkåret. Valgte 13 over 12 fordi 11 vant med NULL skade (stor margin) så 12 vinner nær sikkert komfortabelt (ingen ny info); 13 er den mest informative enkelt-proben. Boss HP (625) og dmg (60) uendret. Gull 4244. Neste run: hvis 13 fortsatt vinner rent -> knivegg 13-14, sett deg der; hvis 13 wiper som 14 -> dropp til 12. Når W15 er ekte coin-flip gjenstår triviell pre-boss (W1-W14 null skade) -> neste pivot er mid-wave re-eskalering så hele spillet er en utfordring, ikke bare W15.",
+  "_prev_notes_run74": "TD-balansering. Run 74 (REN NO-HEAL test av boss-HP-625 #55): INGEN Forsterket tue trukket — W1-W14 ALLE NULL skade ved fulle 500 HP (reneste baseline noensinne, bedre enn run 73 som trengte W5-heal). Gikk inn i W15 ved FULLE 500 HP uten heal. W15 (14 boss @ 625 HP, 60 dmg) wipet likevel fra 500 HP, ai=6 (tårnene drepte 8/14). VIKTIG: ai=6 vs run 73's ai=2 er IKKE regresjon — run 73 entret ved 750 HP (heal) som ga tårnene ~50% lengre fyringstid (run 71 dokumenterte dette artefaktet); denne run's 500 HP-buffer brant ut raskere (500/60≈8 treff, 6 lekkere). boss-HP-625 (#55) målt: 750->625 hjalp transit-kills men full 500 HP no-heal-entry wiper fortsatt fordi ~6 boss lekker og dreneger bufferet. Rot-årsak nå bekreftet STRUKTURELL: 14 boss over 3 laner = ~5/lane, de 6 tårnene dreper kun ~8 i transit UANSETT boss-HP, etterlater ~6 lekkere — for mange for enhver rimelig HP-buffer. Stat-spaker (HP 1000->750->625, dmg 80->60 over run 70-74) uttømt med avtagende gevinst. SPAK denne run (#56): W15 boss count 14->11 (config.ts:246), run 73's dokumenterte fallback. Tårnene dreper fast ~8; 11-8=3 lekkere (HALVERT fra 6). Gull 3410. Neste run: hvis 11-boss full-HP-entry endelig overlever passivt -> hele passiv-spillet løst (W1-W15) -> pre-boss for lett til å måle 40-60% win-rate -> PIVOT til active-play win-rate eller re-eskalér midt-waves; hvis fortsatt wipe, spak boss dmg 60->45 eller 7. gratis tårn.",
   "consecutive_balanced": 0,
   "ai_features_generated": 0,
   "last_error": null,
@@ -12,9 +13,23 @@
     "passive_survives_5_waves": true,
     "win_rate_40_60_pct": false,
     "avg_duration_120_180s": false,
-    "all_15_waves_reachable": true
+    "all_15_waves_reachable": true,
+    "passive_can_clear_all_15": true
   },
   "history": [
+    {
+      "run": 75,
+      "mode": "passive + auto-upgrade (first card each wave, 3x speed badge, Playwright in-page driver v39 — base /frontline-rts/ on PORT 5174 (5173 occupied by eiriksbok), Enter-key start, setInterval auto-clicks .rts-upgrade-card + button.rts-wave-start-btn + G key, records entry+min HP per wave from #game-metrics)",
+      "state": "won",
+      "game_time": 382,
+      "wave_reached": 15,
+      "player_base_hp": 750,
+      "ai_soldiers_remaining": 0,
+      "gold_at_end": 4244,
+      "towers": 6,
+      "notes": "FIRST WIN EVER — clean test of W15-count-11 (#56). HEAL run (Forsterket tue drawn ~W9/W10, 500->750). HP map: W1-W9 ALL ZERO at 500, heal->750 at W10, W10-W15 ALL ZERO at 750 — EVERY single wave took zero damage (entry == min for all 15 waves). W15 (11 boss @ 625 HP, 60 dmg/hit) took ZERO damage from the 750 entry, ai=0 remaining (the 6 towers killed ALL 11 bosses in transit, none reached the base). #56 (count 14->11) was a COMPLETE SUCCESS — the first passive clear of all 15 waves in the loop's history. KEY DIAGNOSTIC: W15 zero-leak means the 6 towers have transit-kill capacity to SPARE (>=11 at 625 HP) — the climax has no teeth and passive win-rate is effectively ~100%, far above the 40-60% victory target. The ENTIRE game is now trivially passive (W1-W14 also all zero damage). Per run 74's documented pivot ('if 11-boss full-HP entry survives -> passive game solved -> re-escalate'), the passive game is now SOLVED. Gold 4244 unspent. Port: turtle dev server on 5174 (5173 = eiriksbok).",
+      "action": "balance (backlog #57): RE-ESCALATE W15 boss count 11->13 (config.ts:246). Reasoning: 11 bosses produced a ZERO-damage clean win (the 6 towers cleared all 11 in transit — capacity >=11), making the climax trivial and passive win-rate ~100%. 14 bosses reliably WIPES (run 74 ai=6 from a 500 entry, run 73 ai=2 from a 750 heal entry). So the knife's edge is 11 < x < 14. 13 is one step below the wipe threshold: it re-introduces ~2-4 leakers against the 625-HP / 60-dmg bosses -> a heal-draw + upgrade-RNG-dependent coin-flip, directly targeting the 40-60% passive win-rate condition. Chose 13 over 12 because 11 won with ZERO damage (large headroom), so 12 almost certainly still wins comfortably (no new info), whereas 13 is the most informative single probe toward the loss side. Boss HP (625, 2.5x) and dmg (60, 1.5x) unchanged. Verified: typecheck clean, reload shows hp=500 + 0 console errors. Goal: passive win-rate drops off 100% toward ~50%. If 13 still wins clean, the knife's edge is 13-14 -> settle there. If 13 wipes like 14, drop to 12. Once W15 is a genuine coin-flip, the pre-boss game (W1-W14 all zero-damage) is still trivial -> the next pivot is mid-wave re-escalation so the whole game is a challenge, not just W15."
+    },
     {
       "run": 74,
       "mode": "passive + auto-upgrade (first card each wave, 3x speed badge, Playwright in-page driver v38 — base /frontline-rts/ on PORT 5174 (5173 occupied by eiriksbok), Enter-key start, setInterval auto-clicks .rts-upgrade-card + wave-start button + G key, records entry+min HP per wave from #game-metrics)",
