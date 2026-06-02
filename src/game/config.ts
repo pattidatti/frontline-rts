@@ -194,12 +194,12 @@ export const CONFIG = {
     { type: 'webber'  as const, x: 420, y: 620 },  // midt + sør — slow-sone for bølge 5-7
     { type: 'stinger' as const, x: 300, y: 770 },  // sør — dekker sør-lane-inngang (bølge 8+)
     { type: 'spitter' as const, x: 350, y: 800 },  // sør — splash AoE mot tunge enheter i klynge (bølge 8)
-    { type: 'spitter' as const, x: 430, y: 540 },  // konvergens-backstop — splash AoE mot klyngede medium-bølger fra ALLE 3 laner rett før arena (run 76: W5/W6/W9 medium lekket 360 HP no-heal og sultet W15-entry til 140). Splash 15 mot single-file 625-HP bosser er neglisjerbar → stabiliserer W15-entry uten å kontaminere count=13-kniveggen.
+    { type: 'spitter' as const, x: 430, y: 540 },  // konvergens-backstop — splash AoE mot klyngede medium-bølger fra ALLE 3 laner rett før arena. Run 76+77: W5/W6/W7 medium lekket ~360 HP no-heal (run 77 døde W9). #58s spitter alene gjorde INGENTING (15 dmg/1800ms = 8.3 DPS, medium 120 HP = 8 treff = 14s >> ~4.6s transit). #59: ga backstoppen tenner (dmg 15→28, fireRate 1800→1200 i TOWER_TYPES) → 23 DPS AoE rydder klyngede medium i transit. Mot single-file 625-HP boss (én om gangen, ingen splash-fordel) ~140 dmg/boss — modest, gjenmåles på W15.
   ] as const,
   TOWER_TYPES: {
     stinger: { cost: 80,  hp: 200, damage: 35, range: 220, fireRate: 800, splash: 0,  slow: 0,    color: 0xb89048 },
     webber:  { cost: 100, hp: 150, damage: 5,  range: 180, fireRate: 1500, splash: 0,  slow: 0.5,  color: 0xc8c8e8 },
-    spitter: { cost: 120, hp: 180, damage: 15, range: 160, fireRate: 1800, splash: 60, slow: 0,    color: 0x8acc6a },
+    spitter: { cost: 120, hp: 180, damage: 28, range: 160, fireRate: 1200, splash: 60, slow: 0,    color: 0x8acc6a },
   } as const,
   TOWER_SLOW_DURATION: 1800,
   TOWER_SELL_REFUND: 0.5,   // andel av opprinnelig byggekost refundert ved salg
