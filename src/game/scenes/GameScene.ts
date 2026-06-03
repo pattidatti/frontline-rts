@@ -977,7 +977,7 @@ export class GameScene extends Phaser.Scene {
 
     const container = this.add.container(startPos.x, startPos.y, [footprint, shadow, antBody, hpBg, hpFg]).setDepth(5);
 
-    const hpMul = (boss ? 2.72 : 1) * modHp;  // heavy 250 -> boss 680 HP (run 82: 625 was zero-damage win, finer knob than +1 boss count)
+    const hpMul = (boss ? 3.2 : 1) * modHp;  // heavy 250 -> boss 800 HP (run 83: 680 still won zero-damage 12/12 -> +8.8% below noise floor, big +17.6% step toward leak threshold)
     const dmgMul = (boss ? 1.5 : 1) * modDmg;
     const finalHp = Math.max(1, Math.round(spec.hp * hpMul));
 
