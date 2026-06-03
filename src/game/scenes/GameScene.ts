@@ -977,7 +977,7 @@ export class GameScene extends Phaser.Scene {
 
     const container = this.add.container(startPos.x, startPos.y, [footprint, shadow, antBody, hpBg, hpFg]).setDepth(5);
 
-    const hpMul = (boss ? 2.5 : 1) * modHp;
+    const hpMul = (boss ? 2.72 : 1) * modHp;  // heavy 250 -> boss 680 HP (run 82: 625 was zero-damage win, finer knob than +1 boss count)
     const dmgMul = (boss ? 1.5 : 1) * modDmg;
     const finalHp = Math.max(1, Math.round(spec.hp * hpMul));
 
