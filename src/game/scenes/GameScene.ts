@@ -977,7 +977,7 @@ export class GameScene extends Phaser.Scene {
 
     const container = this.add.container(startPos.x, startPos.y, [footprint, shadow, antBody, hpBg, hpFg]).setDepth(5);
 
-    const hpMul = (boss ? 3.2 : 1) * modHp;  // heavy 250 -> boss 800 HP (run 83: 680 still won zero-damage 12/12 -> +8.8% below noise floor, big +17.6% step toward leak threshold)
+    const hpMul = (boss ? 4.0 : 1) * modHp;  // heavy 250 -> boss 1000 HP (run 84: 800 STILL won zero-damage 12/12 transit-kill from 750 entry -> leak threshold conclusively >800; decisive +25% jump to 1000 per run 83 plan. HARD STOP: if 1000 also wins zero-damage, boss-HP knob is exhausted -> run 85 MUST pivot to pre-boss teeth, no more cranking)
     const dmgMul = (boss ? 1.5 : 1) * modDmg;
     const finalHp = Math.max(1, Math.round(spec.hp * hpMul));
 
