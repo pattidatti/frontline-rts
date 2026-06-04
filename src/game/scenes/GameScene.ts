@@ -977,7 +977,7 @@ export class GameScene extends Phaser.Scene {
 
     const container = this.add.container(startPos.x, startPos.y, [footprint, shadow, antBody, hpBg, hpFg]).setDepth(5);
 
-    const hpMul = (boss ? 4.0 : 1) * modHp;  // heavy 250 -> boss 1000 HP (run 84: 800 STILL won zero-damage 12/12 transit-kill from 750 entry -> leak threshold conclusively >800; decisive +25% jump to 1000 per run 83 plan. HARD STOP: if 1000 also wins zero-damage, boss-HP knob is exhausted -> run 85 MUST pivot to pre-boss teeth, no more cranking)
+    const hpMul = (boss ? 4.0 : 1) * modHp;  // heavy 250 -> boss 1000 HP. run 85 BREAKTHROUGH: 1000 FINALLY produced W15 teeth — first non-zero-damage climax in the loop's history (heal entry 750 -> 270, -480 = ~3-4 bosses leaked, ~8-9/12 transit-killed), exactly the run-84 prediction (12/12 -> ~9/12). This is the documented "leaks 1-3 -> coin-flip approaches" branch -> HOLD config FIXED (this hpMul AND W15 count=12) and SAMPLE win-rate across runs; do NOT crank further. Heal run won 270/750 (comfortable); a no-heal entry (500) would land ~20 HP or wipe -> genuine coin-flip edge. Next runs: gather a no-heal sample before any change. Only if 2-3 samples show win-rate still >60% -> small bump to ~1100; if a clean entry hard-wipes -> drop to ~880.
     const dmgMul = (boss ? 1.5 : 1) * modDmg;
     const finalHp = Math.max(1, Math.round(spec.hp * hpMul));
 
