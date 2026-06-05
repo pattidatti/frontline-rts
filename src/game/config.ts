@@ -238,7 +238,16 @@ export const CONFIG = {
       { soldiers: 3,  spawnInterval: 950,  lane: 0     as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 4,  spawnInterval: 900,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 1,  spawnInterval: 850,  lane: 2     as const, unitKind: 'heavy'  as const, boss: false },
-      { soldiers: 6,  spawnInterval: 800,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
+      // W9: PRE-BOSS TEETH (run 93). 6->7 medium all-lane. After the W15 boss-HP coin-flip was
+      // LOCKED at 50% (boss 900 / count 12, runs 89-93 -> win_rate_40_60=true), the open issue is
+      // that W1-W14 deal ZERO damage in every run (14/15 of the game is tensionless). W9 is the one
+      // late wave already at the leak threshold (leaked -180 in run 89, 0 in runs 90-93 ~= 1/5 rate).
+      // +1 medium nudges that frequency while keeping per-leak granularity at MEDIUM (creepReachedBase
+      // = damage*3 = 60/leak), the MAX single leak that preserves the locked coin-flip: a -60 leak keeps
+      // a heal entry at 690 > the climax-660 roll, and a no-heal entry at 440 still wins on climax <=360.
+      // A HEAVY leak (-120) would drop heal entry to 630 < 660 -> flip a heal win to a loss -> the dead
+      // heavy waves W10-W14 are too coarse a lever. Smallest-first single +1; boss HP & W15 count UNTOUCHED.
+      { soldiers: 7,  spawnInterval: 800,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 2,  spawnInterval: 800,  lane: 1     as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 2,  spawnInterval: 750,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 3,  spawnInterval: 700,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
