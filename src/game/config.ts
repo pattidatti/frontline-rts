@@ -246,8 +246,14 @@ export const CONFIG = {
       // = damage*3 = 60/leak), the MAX single leak that preserves the locked coin-flip: a -60 leak keeps
       // a heal entry at 690 > the climax-660 roll, and a no-heal entry at 440 still wins on climax <=360.
       // A HEAVY leak (-120) would drop heal entry to 630 < 660 -> flip a heal win to a loss -> the dead
-      // heavy waves W10-W14 are too coarse a lever. Smallest-first single +1; boss HP & W15 count UNTOUCHED.
-      { soldiers: 7,  spawnInterval: 800,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
+      // heavy waves W10-W14 are too coarse a lever. Boss HP & W15 count UNTOUCHED (locked).
+      // Run 94 MEASURED the count 6->7 bump: W9 STILL leaked 0 (heal-run entry=min=750, zero creeps
+      // reached base) -> +1 count is below the saturation threshold. Per run-93's branch (b), escalate
+      // by ESCALATING CONCURRENCY (the real driver of leaks) instead of count: spawnInterval 800->700
+      // (-12.5%) packs ~1 more medium concurrent per lane at the convergence so tower DPS saturates and
+      // a few mediums leak. Count stays 7 (one lever per run, attributable). Per-leak granularity stays
+      // the safe MEDIUM (-60). NEXT run (95): re-read W9 entry/min at 7-count/700ms.
+      { soldiers: 7,  spawnInterval: 700,  lane: 'all' as const, unitKind: 'medium' as const, boss: false },
       { soldiers: 2,  spawnInterval: 800,  lane: 1     as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 2,  spawnInterval: 750,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
       { soldiers: 3,  spawnInterval: 700,  lane: 'all' as const, unitKind: 'heavy'  as const, boss: false },
